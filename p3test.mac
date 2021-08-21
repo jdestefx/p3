@@ -1,0 +1,14 @@
+SUB MAIN
+	/declare a spawn local
+	/declare killSpawnEmpty spawn local
+
+	/if (${a.ID}==0) /echo n1
+
+	/vardata a Spawn[id ${Target.ID}]
+	/echo ID:${a.ID}
+
+	/vardata a 0
+
+	/if (${a.ID}==0) /echo n2
+
+/RETURN

@@ -1,0 +1,168 @@
+#include p3_events.inc
+#include p3_movement.inc
+#include p3_casting.inc
+#include p3_combat.inc
+#include p3_targetting.inc
+
+SUB MAIN {
+	/bc p3 alpha:Starting.
+
+	/declare commands list outer
+	/declare modules list outer
+	/invoke ${modules.Append[movement,combat,targetting,casting]}
+
+	/call p3Setup
+	/call processCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
+	/if (${commandLine[${cmdDEBUG}].NotEqual[-]}) /varset debugMode TRUE
+
+	/bc p3 alpha:Startup complete.
+
+	/while (1) {
+		/doevents
+		/call checkCommandQueue
+		/call checkMaintenance
+		/delay 1
+	}
+
+	/END
+
+}
+
+SUB checkMaintenance {
+	/declare i int local
+
+	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
+		/call ${modules.Item[${i}]}Maintenance
+	/next i
+
+	/RETURN
+}
+
+SUB checkCommandQueue {
+	/declare root string local
+	/declare opts string local
+	/declare i int local
+
+	/if (${cq.Count}==0) /return FALSE
+
+	/varset cqHead ${cq.Head.Upper}
+	/echo cqHead:${cqHead}
+
+	/varset root ${cqHead.Upper.Token[1,:]}
+
+	/if (${Defined[commandStack${root}]}==FALSE) {
+		/echo Unknown root command: ${root}
+		/return
+	} else {
+		/for i 0 to ${Math.Calc[ ${commandStack${root}.Count}-1 ]}
+			/call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
+		/next i
+	}
+
+	/RETURN
+}
+
+SUB processCommandLine(string Param0, string Param1, string Param2, string Param3, string Param4, string Param5) {
+	/declare opts list local
+	/declare i int local
+
+	/declare k string local
+	/declare v string local
+
+	/if (${Bool[${Param0}]}==TRUE) {
+		/invoke ${opts.Append[${Param0}]}
+	}
+	/if (${Bool[${Param1}]}==TRUE) {
+		/invoke ${opts.Append[${Param1}]}
+	}
+	/if (${Bool[${Param2}]}==TRUE) {
+		/invoke ${opts.Append[${Param2}]}
+	}
+	/if (${Bool[${Param3}]}==TRUE) {
+		/invoke ${opts.Append[${Param3}]}
+	}
+	/if (${Bool[${Param4}]}==TRUE) {
+		/invoke ${opts.Append[${Param4}]}
+	}
+	/if (${Bool[${Param5}]}==TRUE) {
+		/invoke ${opts.Append[${Param5}]}
+	}
+
+	/if (${opts.Count}==0) /RETURN
+
+	/for i 0 to ${Math.Calc[ ${opts.Count}-1 ]}
+		/varset k ${opts.Item[${i}].Token[1,=].Upper}
+		/varset v ${opts.Item[${i}].Token[2,=]}
+
+		/echo ${k}:::${v}
+
+		/if (${Defined[cmd${k}]}==TRUE) {
+			/varset commandLine[${cmd${k}}] ${v}
+		}
+	/next i
+
+	/RETURN
+}
+
+
+SUB p3Setup {
+	/declare commandLine[8] string outer -
+	/declare cmdINI string outer 1
+	/declare cmdTAGS string outer 2
+	/declare cmdDEBUG string outer 3
+	/declare debugMode bool outer FALSE
+
+	/declare cq list outer
+	/declare cqHead string outer
+
+	/declare defaultStickOpts string outer 8 uw
+	/declare useMeleeCombat bool outer TRUE
+
+
+	/call initializeModules
+	/RETURN
+}
+
+SUB initializeModules {
+	/declare i int local
+
+	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
+		/echo init: ${modules.Item[${i}]}
+		/call p3_${modules.Item[${i}]}_init
+	/next i
+
+	/for i 0 to ${Math.Calc[ ${commands.Count}-1 ]}
+		/invoke ${commandStack${commands.Item[${i}]}KILL.Sort}
+	/next i
+
+	/RETURN
+}
+
+SUB p3RegisterCommand(string cmd, string funcName, string order) {
+	/varset cmd ${cmd.Upper}
+	/declare stackName string local commandStack${cmd}
+
+	/if (${commands.Contains[${cmd}]}==FALSE) {
+		/invoke ${commands.Append[${cmd}]}
+	}
+
+	/if (${Defined[${stackName}]}==FALSE) {
+		/declare ${stackName} list outer
+	}
+
+	/invoke ${${stackName}.Append[${order}:${funcName}]}
+
+	/RETURN
+}
+
+
+SUB getStackCommandOpt (string opts, string k) {
+	/declare sp int local ${opts.Find[:${k}=]}
+	/declare ret string local - 
+
+	/if (${sp}!=NULL) {
+		/varset ret ${opts.Right[-${sp}].Token[1,:].Token[2,=]}
+	}
+
+	/RETURN ${ret}
+}
