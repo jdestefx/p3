@@ -13,6 +13,8 @@
 #include p3_buffrequests.inc
 #include p3_bardtwist.inc
 #include p3_slay.inc
+#include p3_camp.inc
+#include p3_retreat.inc
 
 #turbo 120
 
@@ -28,7 +30,7 @@ SUB MAIN {
 	/declare perfStart int outer
 	/declare perfIdle int outer
 
-	/invoke ${modules.Append[global,casting,movement,targetting,heals,meleecombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay]}
+	/invoke ${modules.Append[global,casting,movement,targetting,heals,meleecombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay,camp,retreat]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -376,4 +378,9 @@ SUB getSpellDurationByRequestName(string castRequest) {
 	/vardata s ${Macro.Return}
 
 	/RETURN ${s.MyDuration.TotalSeconds}
+}
+
+
+SUB MathDistanceXYZ(string x, string y, string z) {
+	/RETURN ${Math.Distance[${y} ${x} ${z}]}
 }

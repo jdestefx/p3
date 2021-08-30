@@ -392,9 +392,9 @@ SUB processCommandLine() {
 	/if (${commandLine[${cmdINI}].Length}>0) /varset commandLine[${cmdINI}] -${commandLine[${cmdINI}]}
 
 	/if (${commandLine[${cmdDIRECTINI}].Length}>0) {
-		/varset botIniFile e3_bots\${commandLine[${cmdDIRECTINI}]}.ini
+		/varset botIniFile p3_bots\${commandLine[${cmdDIRECTINI}]}.ini
 	} else {
-		/varset botIniFile e3_bots\${MacroQuest.Server}-${Me.CleanName}${commandLine[${cmdINI}]}.ini
+		/varset botIniFile p3_bots\${MacroQuest.Server}-${Me.CleanName}${commandLine[${cmdINI}]}.ini
 	}
 
 	/RETURN

@@ -4,17 +4,26 @@ SUB p3_slay_init {
 	/declare slayProxMobs list outer
 	/declare slayTankStates[16] string outer -
 	/declare slayCheckTimer timer outer 0
+	/declare slaySearch string outer
 
-	/declare slayEnabled bool outer 				FALSE
-	/declare amSlayCoordinator bool outer		FALSE
+
+	/declare slayEnabled bool outer 			FALSE
+
+	/declare amSlayLeader bool outer			FALSE
 	/declare slayMembers string outer			-
-	/declare slaySearch string outer				npc los radius 50 range 1 80
+	/declare slayLevelRange string outer		1 80
+	/declare slayRadius string outer			50
+	/declare slayExtra string outer
 
-	/varset amSlayCoordinator 		${getBotIniOption[Slay.Coordinator,${amSlayCoordinator}]}
-	/varset slayMembers 				${getBotIniOption[Slay.Members,${slayMembers}]}
-	/varset slaySearch 				${getBotIniOption[Slay.SpawnSearch,${slaySearch}]}
+	/varset amSlayLeader 			${getBotIniOption[Slay.Leader,${amSlayLeader}]}
+	/varset slayMembers 			${getBotIniOption[Slay.Members,${slayMembers}]}
+	/varset slayLevelRange 			${getBotIniOption[Slay.MobLevelRange,${slayLevelRange}]}
+	/varset slayRadius 				${getBotIniOption[Slay.ScanRadius,${slayRadius}]}
+	/varset slayExtra 				${getBotIniOption[Slay.ExtraParams,${slayExtra}]}
 
-	/if (${amSlayCoordinator}==TRUE) {
+	/varset slaySearch npc los radius ${slayRadius} range ${slayLevelRange} ${slayExtra}
+
+	/if (${amSlayLeader}==TRUE) {
 		/varset slayEnabled TRUE
 		/call clearTankStates
 	}
@@ -29,7 +38,7 @@ SUB slayStop(string cmd, string opts) {
 
 SUB slayMaintenance {
 	/if (${slayEnabled}==FALSE) /return
-	/if (${amSlayCoordinator}==FALSE) /return
+	/if (${amSlayLeader}==FALSE) /return
 	/if (${slayCheckTimer}>0) /return
 	/if (${Stick.Active}==TRUE && ${assistSpawnID}==0) /RETURN
 
@@ -46,14 +55,16 @@ SUB slayMaintenance {
 SUB scanMobs() {
 	/declare mobCount int local ${SpawnCount[${slaySearch} loc ${Me.X} ${Me.Y}]}
 	/declare i int local
-	/declare mobID int local
+	/declare xSpawn spawn local
+
 	/invoke ${slayProxMobs.Clear}
 
 	/if (${mobCount}==0) /RETURN
 
 	/for i 1 to ${mobCount}
-		/varset mobID ${NearestSpawn[${i},${slaySearch}].ID}
-		/invoke ${slayProxMobs.Append[${mobID}]}
+		/vardata xSpawn NearestSpawn[${i},${slaySearch}]
+		/if (${xSpawn.Aggressive}==FALSE) /continue
+		/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
 	/next i
 
 	/RETURN
@@ -137,4 +148,36 @@ SUB arrayIndexOf(string arr, string search) {
 	/next i
 
 	/RETURN NULL
+}
+
+SUB slayBuildTeam() {
+	/declare i int local
+	/declare j int local 
+	/declare c string local
+	/declare botName string local
+	/declare finalMembers string local
+
+	/declare prefTankOrder list local
+	/invoke ${prefTankOrder.Append[WAR,PAL,SHD,MNK,RNG,ROG,BST,BER]}
+
+	/for i 1 to ${Math.Calc[${prefTankOrder.Count}-1]}
+		/varset c ${prefTankOrder.Item[${i}]}
+
+		/for j 1 to ${NetBots.Counts}
+			/varset botName ${NetBots.Client[${j}]}
+
+			/if (${NetBots[${botName}].Class.ShortName.Equal[${c}]}) {
+				/varset finalMembers ${finalMembers},${botName}
+			}
+		/next j
+	/next i
+
+	/varset finalMembers ${finalMembers.Right[-1]}
+	/varset slayMembers ${finalMembers}
+
+	/call writeBotIniOption "Slay.Members" "${finalMembers}"
+
+	/echo New Slay Team/Order:  ${finalMembers}
+
+	/RETURN
 }
