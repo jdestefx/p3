@@ -3366,4 +3366,389 @@ SUB getSpellDurationByRequestName(string castRequest) {
 
 SUB MathDistanceXYZ(string x, string y, string z) {
 	/RETURN ${Math.Distance[${y} ${x} ${z}]}
+}#include p3_events.inc
+#include p3_global.inc
+#include p3_movement.inc
+#include p3_casting.inc
+#include p3_spellcombat.inc
+#include p3_meleecombat.inc
+#include p3_targetting.inc
+#include p3_assist_tags.inc
+#include p3_autoabilities.inc
+#include p3_buffs.inc
+#include p3_heals.inc
+#include p3_assist.inc
+#include p3_buffrequests.inc
+#include p3_bardtwist.inc
+#include p3_slay.inc
+#include p3_camp.inc
+#include p3_retreat.inc
+
+#turbo 120
+
+SUB MAIN {
+	/echo p3 alpha: Starting...
+
+	/declare cq list outer
+	/declare cqHead string outer
+	/declare commands list outer
+	/declare modules list outer
+	/declare navPlugin bool outer FALSE
+	/declare perfLog list outer
+	/declare perfStart int outer
+	/declare perfIdle int outer
+
+	/invoke ${modules.Append[global,casting,movement,targetting,heals,meleecombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay,camp,retreat]}
+
+	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
+	/call p3Setup
+	/call checkPlugins
+	/call initializeModules
+
+	/echo p3 alpha:Startup complete.
+	/setwintitle ${Me.CleanName}
+
+	/varset perfStart ${MacroQuest.Running}
+
+	/while (1) {
+		/doevents
+		/call checkCommandQueue
+		/call checkMaintenance
+		/delay 2
+		/varset perfIdle ${Math.Calc[${perfIdle}+200]}
+	}
+
+	/END
+}
+
+SUB checkMaintenance {
+	/declare i int local
+	/declare st int local
+	/declare et int local
+
+	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
+		/varset st ${MacroQuest.Running}
+		/call ${modules.Item[${i}]}Maintenance
+		/varset et ${MacroQuest.Running}
+		/varset p3_${modules.Item[${i}]}_perftime ${Math.Calc[${p3_${modules.Item[${i}]}_perftime} + (${et}-${st})]}
+	/next i
+
+	/RETURN
+}
+
+
+SUB checkCommandQueue {
+	/declare root string local
+	/declare opts string local
+	/declare i int local
+
+	/if (${cq.Count}==0) /return FALSE
+
+	/varset cqHead ${cq.Head}
+
+	/varset root ${cqHead.Token[1,;]}
+
+	/if (${Defined[commandStack${root}]}==FALSE) {
+		/echo Unknown root command: ${root}
+		/return
+	} else {
+		/for i 0 to ${Math.Calc[ ${commandStack${root}.Count}-1 ]}
+			/call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
+		/next i
+	}
+
+	/RETURN
+}
+
+SUB importCommandLine(string Param0, string Param1, string Param2, string Param3, string Param4, string Param5) {
+	/declare commandLine[8] string outer
+	/declare cmdINI string outer 1
+	/declare cmdTAGS string outer 2
+	/declare cmdDEBUG string outer 3
+	/declare cmdDIRECTINI string outer 4
+	/declare cmdPAST string outer 5
+
+	/declare opts list local
+	/declare i int local
+
+	/declare k string local
+	/declare v string local
+
+	/if (${Bool[${Param0}]}==TRUE) {
+		/invoke ${opts.Append[${Param0}]}
+	}
+	/if (${Bool[${Param1}]}==TRUE) {
+		/invoke ${opts.Append[${Param1}]}
+	}
+	/if (${Bool[${Param2}]}==TRUE) {
+		/invoke ${opts.Append[${Param2}]}
+	}
+	/if (${Bool[${Param3}]}==TRUE) {
+		/invoke ${opts.Append[${Param3}]}
+	}
+	/if (${Bool[${Param4}]}==TRUE) {
+		/invoke ${opts.Append[${Param4}]}
+	}
+	/if (${Bool[${Param5}]}==TRUE) {
+		/invoke ${opts.Append[${Param5}]}
+	}
+
+	/if (${opts.Count}==0) /RETURN
+
+	/for i 0 to ${Math.Calc[ ${opts.Count}-1 ]}
+		/varset k ${opts.Item[${i}].Token[1,=].Upper}
+		/varset v ${opts.Item[${i}].Token[2,=]}
+
+		/if (${Defined[cmd${k}]}==TRUE) {
+			/varset commandLine[${cmd${k}}] ${v}
+		}
+	/next i
+
+	/RETURN
+}
+
+SUB p3Setup {
+	/declare defaultMeleeCombatClasses string outer BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR
+	/declare defaultSpellCombatClasses string outer CLR,DRU,NEC,WIZ,MAG,ENC,SHM
+	/declare manaClasses string outer CLR,DRU,ENC,PAL,BRD,WIZ,MAG,SHM,NEC,BST,SHD
+	/declare manaRegenClasses string outer CLR,DRU,ENC,PAL,WIZ,MAG,SHM,BST,SHD
+	/declare hasteClasses string outer MNK,BRD,ROG,WAR,RNG,PAL,BST,SHD,BER
+	/declare meleeClasses string outer BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR
+	/declare priestClasses string outer CLR,DRU,SHM
+	/declare hybridClasses string outer PAL,BST,BRD,RNG
+	/declare pureCasterClasses string outer ENC,MAG,NEC,WIZ
+	/declare rangedClasses string outer CLR,DRU,SHM,ENC,MAG,NEC,WIZ
+	/declare castWhileMovingClasses string outer ROG,MNK,BRD
+	/declare tankClasses string outer WAR,PAL,SHD
+	/declare knightClasses string outer PAL,SHD
+	/declare canCastWhileMoving bool outer ${Me.Class.ShortName.Equal[BRD]}
+
+	/RETURN
+}
+
+SUB initializeModules {
+	/declare i int local
+
+	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
+		/declare p3_${modules.Item[${i}]}_perftime int outer
+		/call p3_${modules.Item[${i}]}_init
+	/next i
+
+	/for i 0 to ${Math.Calc[ ${commands.Count}-1 ]}
+		/invoke ${commandStack${commands.Item[${i}]}.Sort}
+	/next i
+
+	/RETURN
+}
+
+SUB checkPlugins () {
+	/if (${Plugin[MQ2EQBC].Name.Length}==NULL) {
+		/echo >>> MQ2EQBC not loaded. Cannot continue. Ending.
+		/end
+	}
+
+	/if (${Plugin[MQ2Dannet].Name.Length}==NULL) {
+		/echo >>> MQ2Dannet not loaded.  ExtendedStackCheck flag will not function.
+	}
+
+	/if (${Plugin[MQ2Collections].Name.Length}==NULL) {
+		/echo >>> MQ2Collections not loaded. Cannot continue. Ending.
+		/end
+	}
+
+	/if (${Bool[${EQBC}]}) {
+		/if (!${EQBC.Connected}) {
+			/bccmd connect
+			/delay 100 ${EQBC.Connected}
+			/delay 5
+			/if (!${EQBC.Connected}) /echo >>> Could not connect to EQBCS.  Macro functionality will be very limited.
+		}
+	}
+	
+	/if (${Plugin[MQ2NetBots].Name.Length}==NULL) {
+		/echo MQ2NetBots not loaded. Cannot continue. Ending.
+		/end
+	} else {
+		/if (${NetBots}) {
+			/squelch /netbots on grab=on send=on
+		}	
+	}
+
+	/if (${Plugin[MQ2Nav].Name.Length}==NULL) {
+		/echo MQ2Nav Plugin not loaded. Some movements mechanics will be limited.
+	} else {
+		/varset navPlugin TRUE
+	}
+
+	/if (${Plugin[MQ2MoveUtils].Name.Length}==NULL) {
+		/echo MQ2MoveUtils not loaded. Cannot continue. Ending.
+		/end
+	}
+
+	/RETURN
+}
+
+SUB p3RegisterCommand(string cmd, string funcName, string order) {
+	/varset cmd ${cmd.Upper}
+	/declare stackName string local commandStack${cmd}
+
+	/if (${commands.Contains[${cmd}]}==FALSE) {
+		/invoke ${commands.Append[${cmd}]}
+	}
+
+	/if (${Defined[${stackName}]}==FALSE) {
+		/declare ${stackName} list outer
+	}
+
+	/invoke ${${stackName}.Append[${order}:${funcName}]}
+
+	/RETURN
+}
+
+SUB getStackCommandOpt (string opts, string k) {
+	/declare sp int local ${opts.Find[;${k}=]}
+	/declare ret string local - 
+
+	/if (${sp}!=NULL) {
+		/varset ret ${opts.Right[-${sp}].Token[1,;].Token[2,=]}
+	}
+
+	/RETURN ${ret}
+}
+
+SUB getBotIniOption(string opt, string defaultResponse) {
+	/declare iniKey string local 
+	/declare iniValue string local
+
+	/varset iniKey ${botIniFile},${opt.Token[1,.]},${opt.Token[2,.]}
+	/varset iniValue ${Ini[${iniKey}]}
+
+	/if (${iniValue.Equal[NULL]}) {
+		/if (${defaultResponse.Equal[FALSE]}) /varset defaultResponse NO
+		/if (${defaultResponse.Equal[TRUE]}) /varset defaultResponse YES
+		/call writeBotIniOption "${opt}" "${defaultResponse}"
+		/RETURN ${defaultResponse}
+	} else {
+		/if (${iniValue.Upper.Equal[ON]} || ${iniValue.Upper.Equal[YES]} || ${iniValue.Upper.Equal[TRUE]}) {
+			/RETURN TRUE
+		} else /if (${iniValue.Upper.Equal[OFF]} || ${iniValue.Upper.Equal[FALSE]} || ${iniValue.Upper.Equal[NO]}) {
+			/RETURN FALSE
+		} else {
+			/RETURN ${iniValue}
+		}
+	}
+
+	/RETURN
+}
+
+SUB writeBotIniOption(string opt, string value) {
+	/ini "${botIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+
+	/RETURN
+}
+
+SUB getSpellFromCastRequest(string castRequest) {
+	/if (${FindItemCount[=${castRequest}]}>0) /return FindItem[=${castRequest}].Spell
+	/if (${Spell[${castRequest}].ID}) /return Spell[${castRequest}]
+	/if (${Me.AltAbility[${castRequest}].ID}) /return Me.AltAbility[${castRequest}].Spell
+	/if (${Me.CombatAbility[${castRequest}]}) { 
+		/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
+		/return CombatAbility[${combatAbilityIndex}]
+	}
+	/RETURN NULL
+}
+
+SUB isLockoutExpired(string timerName) {
+	/if (${Defined[${timerName}]}==TRUE) {
+		/if (${${timerName}}==0) {
+			/deletevar ${timerName}
+			/return TRUE
+		} else {
+			/return FALSE
+		}
+	}
+	/return TRUE
+}
+
+SUB lockout(string timerName, string dur) {
+	/if (${Defined[${timerName}]}==TRUE) {
+		/varset ${timerName} ${dur}
+	} else {
+		/declare ${timerName} timer outer ${dur}
+	}
+
+	/RETURN
+}
+
+SUB wipeLockout(string timerName) {
+	/if (${Defined[${timerName}]}==TRUE) {
+		/deletevar ${timerName}
+	}
+	/RETURN
+}
+
+SUB isCastReady(string request) {
+	/declare castType string local
+
+	/call getCastTypeByCastRequest "${request}"
+	/varset castType ${Macro.Return}
+
+	/if (${castType.Equal[UNKNOWN]}) /return FALSE
+
+	/if (${Me.Silenced.ID}!=NULL) /return FALSE
+
+	/if (${castType.Equal[SPELL]}) {
+		/if (${Me.SpellReady[${request}]}==FALSE) /RETURN FALSE
+		/if (${Me.CurrentMana}<${Me.Spell[${request}].Mana}) /RETURN FALSE
+	}
+
+	/if (${castType.Equal[ALTABILITY]} && ${Me.AltAbilityReady[${request}]}==FALSE) /return FALSE
+	/if (${castType.Equal[ITEM]} && ${Me.ItemReady[${request}]}==FALSE) /return FALSE
+	/if (${castType.Equal[SPELL]} && ${Me.SpellInCooldown}==TRUE && ${Me.Class.ShortName.NotEqual[BRD]}) /return FALSE
+	/if (${castType.Equal[DISCIPLINE]} && ${Me.CombatAbilityReady[${request}]}==FALSE) /return FALSE
+
+	/return TRUE
+}
+
+SUB getCastTypeByCastRequest(string castRequest) {
+	/if (${Me.AltAbility[${castRequest}].ID}) /return ALTABILITY
+	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
+	/if (${Spell[${castRequest}].ID}) /return SPELL
+	/if (${FindItemCount[${castRequest}]}) /return ITEM
+	/RETURN UNKNOWN
+}
+
+SUB p3command(string cmd) {
+	/varset cmd ${cmd.Replace[`,\\"].Replace[\,]}
+
+	/if (${cmd.Find[!!]}!=NULL) {
+		/docommand ${cmd.Replace[!!,$]}
+	} else {
+		/docommand ${cmd}
+	}
+	/RETURN
+}
+
+SUB iniSectionExists(string sectionName) {
+	/declare i int local
+	/varset i ${Select[${sectionName},${Ini[${botIniFile}].Replace[|,,]}]}
+
+	/if (${i}==0) /RETURN FALSE
+
+	/RETURN TRUE
+}
+
+SUB getSpellDurationByRequestName(string castRequest) {
+	/declare s spell local
+	/call getSpellFromCastRequest "${castRequest}"
+
+	/if (${Macro.Return.Equal[NULL]}) /return 0
+	/vardata s ${Macro.Return}
+
+	/RETURN ${s.MyDuration.TotalSeconds}
+}
+
+
+SUB MathDistanceXYZ(string x, string y, string z) {
+	/RETURN ${Math.Distance[${y} ${x} ${z}]}
 }
