@@ -1,3 +1,5 @@
+P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, durability, and ease of use. 
+
 *** IF YOU WANT TO PLAY WITH AN ALPHA VERSION, GET P3A.MAC FROM http://hh.destef.com/download/p3/  --- YOU **must** CREATE A "p3_bots" SUBFOLDER IN YOUR MACROS FOLDER. ***
 
 ::P3 FEATURE STATUS:::
