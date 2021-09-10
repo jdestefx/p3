@@ -352,6 +352,7 @@ SUB isRealSpell(string request) {
 
 SUB memorizeSpellInGem(string spellName, int gemNumber) {
 	/if (${Me.Casting.ID}!=NULL) {
+		/echo interrupt.
 		/interrupt
 		/delay 5
 	}
@@ -429,6 +430,7 @@ SUB getDefaultBCSChannels() {
 SUB fullTarget(int targetID) {
 	
 	/while (${Target.BuffsPopulated}==0) {
+		/if (${Spawn[id ${targetID}].ID}==NULL || ${Spawn[id ${targetID}].Dead}==TRUE) /RETURN FALSE
 		/if (${Target.ID}!=${targetID}) /tar id ${targetID}
 		/delay 1
 	}

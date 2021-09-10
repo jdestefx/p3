@@ -189,6 +189,16 @@ SUB EVENT_remPASTTags(string line, string remTags)
 SUB event_setTwist(string line, string chatSender, string newOrder) {
 	/if (${Me.Class.ShortName.NotEqual[BRD]}) /return
 
+	/if (${newOrder.Upper.Equal[OFF]}) {
+		/twist off 
+		/varset doTwist FALSE
+		/bc Twist is now off.
+		/return
+	} else {
+		/varset doTwist TRUE
+		/bc Twist is now on.
+	}
+
 	/invoke ${cq.Append[NEWTWIST;ORDER=${newOrder}]}
 
 	/RETURN
@@ -302,3 +312,97 @@ SUB event_anchorHere(string line, string who, string newMode)
 		/bc Achor raised.
 	}
 /RETURN
+
+#event adistChange "[#*#(msg)] p3 adist #1#"
+#event adistChange "<#*#> p3 adist #1#"
+#event adistChange "[#*#(msg)] e3 adist #1#"
+#event adistChange "<#*#> e3 adist #1#"
+SUB EVENT_adistChange(string line, string newDist)
+	/varset meleeStickDistance ${newDist}
+	/call setActiveStickParams ${stickMode}
+
+	/varset needRestick TRUE
+	/bc Melee stick distance is now ${newDist}
+/RETURN
+
+
+
+#EVENT adhocCast "[#1#(msg)] e3 cast #2#@#3#"
+#EVENT adhocCast "<#1#> e3 cast #2#@#3#"
+SUB EVENT_adhocCast(string line, string chatSender, string castName, string castTarget)
+	/varset castName ${castName.Upper}
+
+	/declare i int local
+	/declare botName string local
+	/declare botID int local
+	/declare spellID int local
+	/declare castSpell spell local
+
+	/if (${castTarget.Upper.Equal[ALL]}) {
+		/for i 1 to ${NetBots.Counts}
+			/varset botName ${NetBots.Client[${i}]}
+			/varset botID ${NetBots[${botName}].ID}
+			/if (${adhocCastList.Contains[${castName}_${botID}]}==TRUE) /continue
+			/invoke (${adhocCastList.Append[${castName}_${botID}]})
+		/next i
+	} else /if (${castTarget.Upper.Equal[SELF]}) {
+		/if (${adhocCastList.Contains[${castName}_${Me.ID}]}==TRUE) {
+			/bc Already have a cast request for ${castName} for ${Me.CleanName}
+			/return
+		}
+		/invoke ${adhocCastList.Append[${castName}_${Me.ID}]}
+	} else /if (${Spawn["${castTarget}"].ID}!=NULL) {
+		/if (${adhocCastList.Contains[${castName}_${Spawn["${castTarget}"].ID}]}==TRUE) {
+			/bc Already have a cast request for ${castName} for ${Spawn["${castTarget}"].CleanName}
+			/return
+		}
+		/invoke ${adhocCastList.Append[${castName}_${Spawn["${castTarget}"].ID}]}
+	}
+
+/RETURN
+
+
+#EVENT roamWith "[#1#(msg)] e3 roam with #1#"
+#EVENT roamWith "<#*#> e3 roam with #1#"
+#EVENT roamWith "[#1#(msg)] p3 roam with #1#"
+#EVENT roamWith "<#*#> p3 roam with #1#"
+SUB EVENT_roamWith(string line, string spawnSearch)
+	/varset roamTargetID ${Spawn[${spawnSearch}].ID}
+	/invoke ${cq.Append[ROAMLOCK;TARGETID=${roamTargetID};]}
+/RETURN
+
+#EVENT stopRoam "[#1#(msg)] e3 roam off"
+#EVENT stopRoam "<#*#> e3 roam off"
+#EVENT stopRoam "[#1#(msg)] p3 roam off"
+#EVENT stopRoam "<#*#> p3 roam off"
+SUB EVENT_stopRoam(string line, string spawnSearch)
+	/invoke ${cq.Append[ROAMLOCK;TARGETID=0;]}
+/RETURN
+
+
+
+#event autoMed "[#1#(msg)] p3 automed #2#"
+#event autoMed "<#1#> p3 automed #2#"
+SUB event_autoMed(string line, string who, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/call setAutoMed TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/call setAutoMed FALSE
+	}
+/RETURN
+
+
+#EVENT medOffFromHit "#*# YOU for#*#points of damage."
+SUB EVENT_medOffFromHit
+	/if (${doAutoMed}==TRUE) {
+		/call pauseAutoMed 20s
+	}
+/RETURN
+
+#event expSpammerResponder "#*#You gained raid experience#*#"
+#event expSpammerResponder "#*#You gain party experience#*#"
+#event expSpammerResponder "#*#You gain experience#*#"
+SUB event_expSpammerResponder
+	/call expTrackerNewExp
+/return
+

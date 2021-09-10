@@ -15,6 +15,11 @@
 #include p3_slay.inc
 #include p3_camp.inc
 #include p3_retreat.inc
+#include p3_castorders.inc
+#include p3_roam.inc
+#include p3_automed.inc
+#include p3_exptrack.inc
+#include p3_mine.inc
 
 #turbo 120
 
@@ -29,8 +34,11 @@ SUB MAIN {
 	/declare perfLog list outer
 	/declare perfStart int outer
 	/declare perfIdle int outer
+	/declare st int local
+	/declare et int local
 
-	/invoke ${modules.Append[global,casting,movement,targetting,heals,meleecombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay,camp,retreat]}
+	/invoke ${cq.Delimiter[^]}
+	/invoke ${modules.Append[global,exptrack,automed,casting,heals,movement,targetting,meleecombat,spellcombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay,camp,retreat,roam,castorders,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -43,11 +51,13 @@ SUB MAIN {
 	/varset perfStart ${MacroQuest.Running}
 
 	/while (1) {
-		/doevents
 		/call checkCommandQueue
 		/call checkMaintenance
+
+		/varset st ${MacroQuest.Running}
 		/delay 2
-		/varset perfIdle ${Math.Calc[${perfIdle}+200]}
+		/varset et ${MacroQuest.Running}
+		/varset perfIdle ${Math.Calc[${perfIdle}+ (${et}-${st})]}
 	}
 
 	/END
@@ -60,6 +70,7 @@ SUB checkMaintenance {
 
 	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
 		/varset st ${MacroQuest.Running}
+		/doevents
 		/call ${modules.Item[${i}]}Maintenance
 		/varset et ${MacroQuest.Running}
 		/varset p3_${modules.Item[${i}]}_perftime ${Math.Calc[${p3_${modules.Item[${i}]}_perftime} + (${et}-${st})]}
@@ -238,6 +249,7 @@ SUB p3RegisterCommand(string cmd, string funcName, string order) {
 }
 
 SUB getStackCommandOpt (string opts, string k) {
+
 	/declare sp int local ${opts.Find[;${k}=]}
 	/declare ret string local - 
 
@@ -292,6 +304,7 @@ SUB getSpellFromCastRequest(string castRequest) {
 
 SUB isLockoutExpired(string timerName) {
 	/if (${Defined[${timerName}]}==TRUE) {
+		/echo ${timerName} was defined. val:  ${${timerName}}
 		/if (${${timerName}}==0) {
 			/deletevar ${timerName}
 			/return TRUE
@@ -304,8 +317,11 @@ SUB isLockoutExpired(string timerName) {
 
 SUB lockout(string timerName, string dur) {
 	/if (${Defined[${timerName}]}==TRUE) {
-		/varset ${timerName} ${dur}
+		/if (${${timerName}}<${dur}) {
+			/varset ${timerName} ${dur}
+		}
 	} else {
+		/echo /declare ${timerName} timer outer ${dur}
 		/declare ${timerName} timer outer ${dur}
 	}
 
@@ -383,4 +399,14 @@ SUB getSpellDurationByRequestName(string castRequest) {
 
 SUB MathDistanceXYZ(string x, string y, string z) {
 	/RETURN ${Math.Distance[${y} ${x} ${z}]}
+}
+
+
+SUB checkOpenWindows() {
+	/if (${Window[BigBankWnd].Open})    /return TRUE
+	/if (${Window[TradeWnd].Open})      /return TRUE
+	/if (${Window[GuildBankWnd].Open})  /return TRUE
+	/if (${Window[MerchantWnd].Open})   /return TRUE
+	/if (${Window[SpellBookWnd].Open})  /return TRUE
+	/return FALSE
 }

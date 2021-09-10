@@ -38,7 +38,9 @@ SUB validateAssistTags(string tagsToCheck, bool asOrOperator) {
 	/invoke ${checkTags.Append[${tagsToCheck}]}
 
 	/for i 0 to ${Math.Calc[${checkTags.Count}-1]}
-		/if (${fullTags.Contains[${checkTags.Item[${i}]}]}) /varset matches ${Math.Calc[${matches}+1]}
+		/if (${fullTags.Contains[${checkTags.Item[${i}]}]}) {
+			/varset matches ${Math.Calc[${matches}+1]}
+		}
 	/next i
 
 	/if (${asOrOperator}==TRUE && ${matches}>0) {

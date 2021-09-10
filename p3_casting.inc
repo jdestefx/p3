@@ -34,12 +34,18 @@ SUB castingSetIdle() {
 }
 
 SUB castingFollow(string cmd, string opts) {
-	/if (${Me.Casting.ID}!=NULL && ${Me.Class.ShortName.Equal[BRD]}==FALSE) /interrupt
+	/if (${Me.Casting.ID}!=NULL && ${Me.Class.ShortName.Equal[BRD]}==FALSE) {
+		/echo stop for casting follow
+		/interrupt
+	}
 	/RETURN
 }
 
 SUB castingStop(string cmd, string opts) {
-	/if (${Me.Casting.ID}!=NULL) /interrupt
+	/if (${Me.Casting.ID}!=NULL) {
+		/echo stop cast seen.
+		/interrupt
+	}
 	/RETURN
 }
 
@@ -53,7 +59,6 @@ SUB castingCast(string cmd, string opts) {
 		/varset castingTargetID ${getStackCommandOpt[${castingOpts},TARGETID]}
 		/invoke ${castingCancelConditions.Append[${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]}
 		/echo Cast Started [${castingSpell}].
-		/delay 5
 	} else /if (${Macro.Return.Equal[PASS_INSTANT_CAST]}) {
 		/echo Instant cast [${getStackCommandOpt[${opts},SPELL]}] done.
 		/call castComplete PASS_INSTANT_CAST
@@ -101,8 +106,9 @@ SUB castingMaintenance() {
 
 	/if (${Me.Casting.ID}==NULL) {
 		/if (${castingSpell.ID} != NULL) {
+			/delay 3
 			/echo Detected end of cast for [${castingSpell}] => ${Cast.Result}
-
+			
 			/varset sourceArr ${getStackCommandOpt[${castingOpts},SRC]}
 			/varset i ${getStackCommandOpt[${castingOpts},SRCIDX]}
 
@@ -136,6 +142,11 @@ SUB checkCancelConditions() {
 
 	/for i 0 to ${Math.Calc[${castingCancelConditions.Count}-1]}
 		/varset e ${castingCancelConditions.Item[${i}]}
+
+		/if (${e.Find[TARGETDEAD]}!=NULL) {
+			/if (${Target.Dead}==TRUE) /return TRUE
+		}
+
 
 		/if (${e.Find[TARGETISASSITTARGET]}!=NULL) {
 			/if (${assistTarget}==${Target.ID}) /return TRUE
@@ -208,15 +219,19 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 
 	/if (${castType.Equal[ALTABILITY]}) {
 		/alt act ${AltAbility[${castName}].ID}
+		/delay 5
 	} else /if (${castType.Equal[ITEM]}) {
 		/itemnotify "${castName}" rightmouseup
+		/delay 3
 	} else {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
 			/twist once ${Me.Gem[${castName}]}
 		} else {
 			/cast "${castName}"
 		}
+		/delay 3
 	}
+
 
 	/varset ret PASS_CAST_STARTED
 
@@ -242,7 +257,7 @@ SUB castComplete(string result) {
 
 	/if (${funcName.Equal[-]}) /RETURN
 	
-	/call ${funcName} ${result} ${castingOpts}
+	/call ${funcName} ${result} "${castingOpts}"
 
 	/RETURN
 }

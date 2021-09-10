@@ -1,11 +1,11 @@
 SUB p3_slay_init {
 	/call p3RegisterCommand STOP slayStop 50
+	/call p3RegisterCommand KILL slayKill 50
 
 	/declare slayProxMobs list outer
 	/declare slayTankStates[16] string outer -
 	/declare slayCheckTimer timer outer 0
 	/declare slaySearch string outer
-
 
 	/declare slayEnabled bool outer 			FALSE
 
@@ -31,8 +31,16 @@ SUB p3_slay_init {
 	/RETURN
 }
 
+
+SUB slayKill(string cmd, string opts) {
+	/varset slayCheckTimer 2
+	/RETURN
+}
+
+
 SUB slayStop(string cmd, string opts) {
 	/call clearTankStates
+	/varset slayCheckTimer 30
 	/return
 }
 
@@ -40,7 +48,7 @@ SUB slayMaintenance {
 	/if (${slayEnabled}==FALSE) /return
 	/if (${amSlayLeader}==FALSE) /return
 	/if (${slayCheckTimer}>0) /return
-	/if (${Stick.Active}==TRUE && ${assistSpawnID}==0) /RETURN
+	/if ((${Stick.Active}==TRUE || ${Nav.Active}==TRUE) && ${assistSpawnID}==0) /RETURN
 
 	/varset slayCheckTimer 5
 
@@ -121,7 +129,7 @@ SUB checkTankAssignments() {
 
 		/if (${arrayIndexOf[slayTankStates,:${slayProxMobs.Item[${i}]}]}==NULL) {
 			/varset slayTankStates[${freeTankIndex}] ${freeTankName}:${mobID}
-			/bct ${freeTankName} p3 kill ${mobID}
+			/bct ${freeTankName} assist on ${mobID}
 		}
 	/next i
 
@@ -130,8 +138,11 @@ SUB checkTankAssignments() {
 
 SUB getFreeTankIndex() {
 	/declare i int local
+	/declare tankName string local
 
 	/for i 0 to ${Math.Calc[${slayTankStates.Size}-1]}
+		/varset tankName ${slayTankStates[${i}].Token[1,:]}
+		/if (${Spawn[=${tankName}].ID}==NULL) /continue
 		/if (${slayTankStates[${i}].Find[:0]}!=NULL) /return ${i}
 	/next i
 

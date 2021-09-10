@@ -2,6 +2,7 @@ SUB p3_meleecombat_init {
 	/call p3RegisterCommand KILL meleecombatKill 50
 	/call p3RegisterCommand STOP meleecombatStop 50
 	/call p3RegisterCommand FOLLOW meleecombatFollow 50
+	/call p3RegisterCommand ROAMMOVESTART meleecombatRoamMoveStart 45
 
 	/declare meleeTargetID int outer 0
 
@@ -13,6 +14,11 @@ SUB p3_meleecombat_init {
 	/varset meleeRetreatPct 			${getBotIniOption[Assist.MeleeRetreatPercent,${meleeRetreatPct}]}
 	/varset meleeRetreatResumePct 		${getBotIniOption[Assist.MeleeRetreatResumePercent,${meleeRetreatResumePct}]}
 
+	/RETURN
+}
+
+SUB meleecombatRoamMoveStart(string cmd, string opts) {
+	/call meleecombatStop
 	/RETURN
 }
 

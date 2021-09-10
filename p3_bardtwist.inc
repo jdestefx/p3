@@ -3,8 +3,8 @@ SUB p3_bardtwist_init {
 
 	/call p3RegisterCommand NEWTWIST bardtwistNewTwist 50
 
-
 	/declare notCastingTimer timer outer 30
+	/declare doTwist bool outer TRUE
 
 	/declare twistOrder string outer		1 2 3 4
 	/varset twistOrder 						${getBotIniOption[Bard.TwistOrder,${twistOrder}]}
@@ -19,7 +19,7 @@ SUB bardtwistMaintenance {
 	/if (${Me.Casting.ID}!=NULL) /varset notCastingTimer 30
 
 	/if (${notCastingTimer}==0) {
-		/if (${Twist.Twisting}==FALSE) /twist ${twistOrder}
+		/if (${Twist.Twisting}==FALSE && ${doTwist}==TRUE) /twist ${twistOrder}
 	}
 
 	/RETURN

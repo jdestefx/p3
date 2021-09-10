@@ -57,6 +57,7 @@ SUB checkNeedsBuffsQueue() {
 	/varset spawnName ${Spawn[id ${spawnID}].CleanName}
 
 	/call fullTarget ${spawnID}
+	/if (${Macro.Return}==FALSE) /RETURN
 
 	/for i 1 to ${iniBuffRequests.Size}
 		/if (${iniBuffRequests[${i},1].Equal[-]}) /break

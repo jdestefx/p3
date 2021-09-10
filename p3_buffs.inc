@@ -327,7 +327,7 @@ SUB checkBuffs {
 				/vardata buffSpawn Spawn[pc ${targetNames.Item[0]}]
 			}
 		}
-
+		
 		/if (${buffSpawn.ID}==NULL) /continue
 
 		/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==FALSE) /break
@@ -347,7 +347,6 @@ SUB checkBuffs {
 			/delay 3
 		}
 
-		/echo cast: /invoke cq.Append[CAST;SPELL=${buffCastName};TARGETID=${buffSpawn.ID};BUFFSPELLID=${buffSpellID};CANCELCONDITIONS=${cancelConditions};SRC=iniBuffs;SRCIDX=${i};ONRESULT=onBuffCastResult]
 		/invoke (${cq.Append[CAST;SPELL=${buffCastName};TARGETID=${buffSpawn.ID};BUFFSPELLID=${buffSpellID};CANCELCONDITIONS=${cancelConditions};SRC=iniBuffs;SRCIDX=${i};ONRESULT=onBuffCastResult]})
 		/break
 
@@ -364,7 +363,7 @@ SUB onBuffCastResult(string result, string opts) {
 	/declare buffSpellID ${getStackCommandOpt[${opts},BUFFSPELLID]}
 
 	/if (${iniBuffs[${i},${bNoSitTimer}].NotEqual[-]}) {
-		/echo call pauseMedBreak ${iniBuffs[${i},${bNoSitTimer}]}
+		/call pauseAutoMed ${iniBuffs[${i},${bNoSitTimer}]}
 	}
 
 	/if (${result.Equal[FAIL_CAST_TAKEHOLD]}==TRUE) {

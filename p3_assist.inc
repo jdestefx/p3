@@ -6,7 +6,7 @@ SUB p3_assist_init {
 	/declare assistSpawnID int outer 0
 	/declare combatStateCheckTimer timer outer 0
 	/declare combatStateTimer timer outer 0
-	/declare combatStateTimerMax int outer 20
+	/declare combatStateTimerMax int outer 50
 	/declare autoAssistHoldTimer timer outer 0
 	/declare autoAssistCheckTimer timer outer 0
 
@@ -31,7 +31,9 @@ SUB assistKill(string cmd, string opts) {
 
 SUB assistStop(string cmd, string opts) {
 	/declare holdTimer string local ${getStackCommandOpt[${opts},ASSISTHOLDTIMER]}
-	/if (${holdTimer.NotEqual[-]}) /varset autoAssistHoldTimer ${holdTimer}
+	/if (${holdTimer.NotEqual[-]}) {
+		/varset autoAssistHoldTimer ${holdTimer}
+	}
 
 	/varset combatStateTimer 5
 	/varset assistSpawnID 0

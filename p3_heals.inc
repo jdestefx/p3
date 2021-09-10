@@ -1,5 +1,4 @@
 SUB p3_heals_init {
-
 	/declare healCheckTimer timer outer 0
 	/declare teamIndex int outer 1
 	/declare enableteamIndex bool outer TRUE
@@ -24,12 +23,13 @@ SUB healsMaintenance() {
 	}	
 
 	/if (${healCheckTimer}==0) {
-		/if (${Me.Casting.ID}!=0) /return
+		/if (${Me.Casting.ID}!=NULL) /return
 		/if (${Me.Invis}==TRUE) /RETURN
 		/if (${Me.Silenced.ID}!=NULL) /RETURN
-		/if (${movingTimer}>0 && ${canCastWhileMoving}==FALSE) /return
+		/if (${Me.Moving}==TRUE && ${canCastWhileMoving}==FALSE) /return
+
+		/varset healCheckTimer 3
 		/call checkHeals
-		/varset healCheckTimer 5
 	}
 
 	/RETURN
@@ -75,7 +75,6 @@ SUB checkHeals {
 				/if (${Macro.Return}==TRUE) /continue
 			}
 		}
-
 		/if (${iniHeals[${i},${bRequireAssistTag}].NotEqual[-]}) {
 			/if (${assistTags.Count}==0 && ${persistentAssistTags.Count}==0) /continue
 			/call validateAssistTags ${iniHeals[${i},${bRequireAssistTag}]}
@@ -396,7 +395,7 @@ SUB determineTeamIndex
 		| IS ANOTHER NETBOT STUNNED OR DEAD? INCREASE MY PRIORITY
 		/if (${Select[${NetBots[${entryName}].State},DEAD,STUN,HOVER]}>0) {
 			/varset teamIndex ${Math.Calc[${teamIndex}-1]}
-			/break
+			/continue
 		}
 
 		| DOES MY MANA MATCH ANOTHER EXACTLY? ONE OF US NEEDS TO DEFER - USE ID AS A SEQUENTIAL DIFFERENTIATOR
