@@ -7,6 +7,9 @@ SUB p3_assist_init {
 	/declare combatStateCheckTimer timer outer 0
 	/declare combatStateTimer timer outer 0
 	/declare combatStateTimerMax int outer 50
+	/declare combatStateLongTimer timer outer 0
+	/declare combatStateLongTimerMax int outer 150
+
 	/declare autoAssistHoldTimer timer outer 0
 	/declare autoAssistCheckTimer timer outer 0
 
@@ -14,11 +17,13 @@ SUB p3_assist_init {
 	/declare maxAssistDistance int outer 		500
 	/declare useAutoFire bool outer				FALSE
 	/declare autoAssistPercent int outer		99
+	/declare useEQCombatIndicator bool outer	TRUE
 
 	/varset autoAssist 				${getBotIniOption[Assist.AutoAssist,${autoAssist}]}
 	/varset autoAssistPercent		${getBotIniOption[Assist.AutoAssistPercent,${autoAssistPercent}]}
 	/varset maxAssistDistance 		${getBotIniOption[Assist.MaxAssistDistance,${maxAssistDistance}]}
 	/varset useAutoFire 			${getBotIniOption[Assist.UseAutoFire,${useAutoFire}]}
+	/varset useEQCombatIndicator	${getBotIniOption[Misc.CombatStateUsesGameIndicator,${useEQCombatIndicator}]}
 
 	/RETURN
 }
@@ -35,7 +40,9 @@ SUB assistStop(string cmd, string opts) {
 		/varset autoAssistHoldTimer ${holdTimer}
 	}
 
-	/varset combatStateTimer 5
+	| setting this low too fast will trigger buffs in the middle of combat
+	|/varset combatStateTimer 5
+
 	/varset assistSpawnID 0
 	/RETURN
 }
@@ -95,23 +102,33 @@ SUB updateCombatStateTimer() {
 	/declare i int local
 	/declare botName string local
 
-	/if (${Me.Combat}==TRUE) {
+	/if (${combatStateCheckTimer}>0) /return
+	/varset combatStateCheckTimer 5
+
+	/if (${NetBots[${Me}].CombatState}==0) {
 		/varset combatStateTimer ${combatStateTimerMax}
+		/varset combatStateLongTimer ${combatStateLongTimerMax}		
 		/return
 	}
-
-	/if (${combatStateCheckTimer}>0) /return
-	/varset combatStateCheckTimer 3
 
 	/for i 1 to ${NetBots.Counts}
 		/varset botName ${NetBots.Client[${i}]}
 
-		/if (${NetBots[${botName}].Attacking} == TRUE) {
-			/if (${NetBots[${botName}].Zone} != ${Zone.ID}) /continue
-			/if (${Spawn[pc ${botName}].Distance} > ${maxAssistDistance}) /continue
+		/if (${useEQCombatIndicator}==TRUE) {
+			/if (${NetBots[${botName}].CombatState}==0) {
+				/varset combatStateTimer ${combatStateTimerMax}
+				/varset combatStateLongTimer ${combatStateLongTimerMax}
+				/RETURN
+			}
+		} else {
+			/if (${NetBots[${botName}].Attacking} == TRUE) {
+				/if (${NetBots[${botName}].Zone} != ${Zone.ID}) /continue
+				/if (${Spawn[pc ${botName}].Distance} > ${maxAssistDistance}) /continue
 
-			/varset combatStateTimer ${combatStateTimerMax}
-			/return
+				/varset combatStateTimer ${combatStateTimerMax}
+				/varset combatStateLongTimer ${combatStateLongTimerMax}
+				/return
+			}
 		}
 
 	/next i

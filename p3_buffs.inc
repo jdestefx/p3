@@ -1,6 +1,7 @@
 SUB p3_buffs_init {
 	/declare updateNetnoteTimer timer outer 0
-	/declare buffCheckTimer timer outer 10
+	/declare buffCheckTimer timer outer 30
+	/declare buffsEnabled bool outer true
 
 	/call validateSpellBasedArray iniBuffs
 	/call processArrayTargets iniBuffs
@@ -11,6 +12,8 @@ SUB p3_buffs_init {
 }
 
 SUB buffsMaintenance() {
+	/if (${buffsEnabled}==FALSE) /return
+
 	/call updateNetnoteBuffDurations
 
 	/if (${Me.Invis}==TRUE) /return
@@ -24,7 +27,7 @@ SUB buffsMaintenance() {
 
 SUB updateNetnoteBuffDurations {
 	/if (${updateNetnoteTimer}>0) /return
-	/varset updateNetnoteTimer 10
+	/varset updateNetnoteTimer 5
 
 	/declare i int local
 	/declare buffDurations string local
@@ -41,7 +44,9 @@ SUB updateNetnoteBuffDurations {
 
 SUB checkBuffs {
 	/if (${buffCheckTimer}>0) /return
-	/varset buffCheckTimer 5
+	/varset buffCheckTimer 15
+
+	|/echo buffecheck: combatTimer: ${combatStateTimer}
 
 	/declare i int local 
 	/declare targetNames list local 
@@ -69,10 +74,6 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},1].Equal[-]}) /break
 		/if (${iniBuffs[${i},${bEnabled}].Equal[NO]}) /continue
 
-		/if (${useStrictCombatCheck}==TRUE && ${Me.CombatState.Equal[COMBAT]}) {
-			/if (${iniBuffs[${i},${bCastableDuringAssist}].Equal[-]}) /continue
-		}
-		
 		/if (${combatStateTimer}>0) {
 			/if (${iniBuffs[${i},${bCastableDuringAssist}].Equal[-]}) /continue
 		}
@@ -372,9 +373,11 @@ SUB onBuffCastResult(string result, string opts) {
 
 	/if (${result.Equal.Equal[PASS_CAST_SUCCESS]}) {
 		/if (${NetBots[${Spawn[id ${targetID}].CleanName}].Level}!=NULL) {
+			/bc tell ${NetBots[${Spawn[id ${targetID}].CleanName} NETNOTE
 			/squelch /bct ${buffSpawn.CleanName} //netnote
 		}
 	}
+
 
 	/RETURN
 }

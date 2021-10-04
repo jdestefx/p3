@@ -55,8 +55,6 @@ SUB checkCombatSpells {
 	/declare castResult string local
 	/declare cSpell spell local
 	/declare cSpellName string local
-	/declare cTimerName string local
-	/declare cTimerValue int local 0
 	/declare maxResists int local 5
 	/declare currentResistCount int local 0
 	/declare cancelConditions string local
@@ -65,10 +63,7 @@ SUB checkCombatSpells {
 	/declare lifeRatio int local
 
 	/for i 1 to ${iniCombatSpells.Size}
-
-
 		/varset cSpellName ${iniCombatSpells[${i},1]}
-		/varset cTimerValue 0
 		/varset currentResistCount 0
 		/varset maxResists 5
 		/varset cancelConditions TARGETDEAD|
@@ -148,6 +143,7 @@ SUB checkCombatSpells {
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetOverHP}].NotEqual[-]}) {
+			/echo check TargetOverHP... 
 			/call fullTarget ${spellKillID}
 			/if (${Macro.Return}==FALSE) /continue
 			/if (${Target.PctHPs} < ${iniCombatSpells[${i},${bTargetOverHP}]}) /continue
@@ -186,9 +182,9 @@ SUB checkCombatSpells {
 		/call getSpellFromCastRequest "${cSpellName}"
 		/vardata cSpell ${Macro.Return}
 
-		/varset cTimerName detriTimer_${cSpell.ID}
+		/if (${isLockoutExpired[detriTimer_${cSpell.ID}]}==FALSE) /continue
+		/if (${isLockoutExpired[detriTimer_${spellKillID}_${cSpell.ID}]}==FALSE) /continue
 
-		/if (${isLockoutExpired[${cTimerName}]}==FALSE) /continue
 
 		/invoke (${cq.Append[CAST;SPELL=${cSpellName};TARGETID=${spellKillID};CANCELCONDITIONS=${cancelConditions};SRC=combatSpells;SRCIDX=${i};ONRESULT=onCombatCastResult]})
 		/break
@@ -201,13 +197,16 @@ SUB checkCombatSpells {
 SUB onCombatCastResult(string result, string opts) {
 	/declare i int local ${getStackCommandOpt[${opts},SRCIDX]}
 	/declare cSpellName string local ${getStackCommandOpt[${opts},SPELL]}
-	/declare timerName string local
+	/declare recastDelayTimerName string local
+	/declare targetDurationTimerName string local
 	/declare cSpell spell local
+	/declare targetID string local ${getStackCommandOpt[${opts},TARGETID]}
 
 	/call getSpellFromCastRequest "${cSpellName}"
 	/vardata cSpell ${Macro.Return}
 
-	/varset timerName detriTimer_${cSpell.ID}
+	/varset recastDelayTimerName detriTimer_${cSpell.ID}
+	/varset targetDurationTimerName detriTimer_${targetID}_${cSpell.ID}
 
 	/if (${result.Find[FAIL_CAST_TAKEHOLD]}!=NULL) {
 		/call lockout ${timerName} 120
@@ -218,16 +217,16 @@ SUB onCombatCastResult(string result, string opts) {
 			/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
 		}
 
-		/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]} || ${cSpell.Duration.TotalSeconds} > 0) {
-
-			/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
-				/call lockout ${timerName} ${iniCombatSpells[${i},${bRecastDelay}]}
-			}
-
-			/if (${cSpell.Duration.TotalSeconds}>0) {
-				/call lockout ${timerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}]}s
-			}
+		/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
+			/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
 		}
+
+		/if (${cSpell.Duration.TotalSeconds}>0) {
+			/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
+		}
+
+		|/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]} || ${cSpell.Duration.TotalSeconds} > 0) {
+		|}
 
 	} else /if (${result.Equal[FAIL_CAST_RESIST]}) {
 		|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}

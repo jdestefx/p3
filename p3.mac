@@ -19,6 +19,7 @@
 #include p3_roam.inc
 #include p3_automed.inc
 #include p3_exptrack.inc
+#include p3_autotrapdisarm.inc
 #include p3_mine.inc
 
 #turbo 120
@@ -38,7 +39,7 @@ SUB MAIN {
 	/declare et int local
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,exptrack,automed,casting,heals,movement,targetting,meleecombat,spellcombat,assist_tags,autoabilities,buffs,assist,buffrequests,bardtwist,slay,camp,retreat,roam,castorders,mine]}
+	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,assist,exptrack,automed,heals,movement,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -51,11 +52,14 @@ SUB MAIN {
 	/varset perfStart ${MacroQuest.Running}
 
 	/while (1) {
+		/if (!${MacroQuest.GameState.Equal[INGAME]}) /end
+		/if (!${Bool[${Me.Class}]}) /endmacro
+
 		/call checkCommandQueue
 		/call checkMaintenance
 
 		/varset st ${MacroQuest.Running}
-		/delay 2
+		/delay 1
 		/varset et ${MacroQuest.Running}
 		/varset perfIdle ${Math.Calc[${perfIdle}+ (${et}-${st})]}
 	}
@@ -74,6 +78,11 @@ SUB checkMaintenance {
 		/call ${modules.Item[${i}]}Maintenance
 		/varset et ${MacroQuest.Running}
 		/varset p3_${modules.Item[${i}]}_perftime ${Math.Calc[${p3_${modules.Item[${i}]}_perftime} + (${et}-${st})]}
+
+		/if (${Macro.Return.Equal[RESET]}) {
+			|/echo Loop reset requested... (from ${modules.Item[${i}]}Maintenance)
+			/break
+		}
 	/next i
 
 	/RETURN
@@ -316,6 +325,10 @@ SUB isLockoutExpired(string timerName) {
 }
 
 SUB lockout(string timerName, string dur) {
+	/if (${dur.Right[1].Equal[s]}) {
+		/varset dur ${Math.Calc[${dur.Left[-1]}*10]}
+	}
+
 	/if (${Defined[${timerName}]}==TRUE) {
 		/if (${${timerName}}<${dur}) {
 			/varset ${timerName} ${dur}

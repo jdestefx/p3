@@ -36,7 +36,7 @@ SUB checkCamp() {
 	}
 
 	/if (${Stick.Active}==TRUE || ${Navigation.Active}==TRUE) /RETURN
-	/if (${combatTimer}>0) /RETURN
+	/if (${combatStateTimer}>0) /RETURN
 
 	/if (${Math.Distance[${campY}, ${campX}, ${campZ}]}>15) {
 		/if (${Navigation.MeshLoaded}==TRUE && ${Navigation.Active}==FALSE && ) {

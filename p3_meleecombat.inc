@@ -11,8 +11,6 @@ SUB p3_meleecombat_init {
 	/declare meleeRetreatResumePct int outer 		80
 
 	/varset useMeleeCombat 				${getBotIniOption[Assist.UseMeleeCombat,${useMeleeCombat}]}
-	/varset meleeRetreatPct 			${getBotIniOption[Assist.MeleeRetreatPercent,${meleeRetreatPct}]}
-	/varset meleeRetreatResumePct 		${getBotIniOption[Assist.MeleeRetreatResumePercent,${meleeRetreatResumePct}]}
 
 	/RETURN
 }
@@ -45,6 +43,11 @@ SUB meleecombatMaintenance() {
 
 	/if (${meleeTargetID}==0) {
 		/if (${Me.Combat}==TRUE) /attack off
+		/return
+	}
+
+	/if (${Spawn[id ${meleeTargetID}].ID}==NULL || ${Spawn[id ${meleeTargetID}].Dead}==TRUE) {
+		/call meleecombatStop
 		/return
 	}
 

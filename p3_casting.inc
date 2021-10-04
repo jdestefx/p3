@@ -79,44 +79,52 @@ SUB castingMaintenance() {
 	/if (${Me.Casting.ID}!=NULL) {
 		/if (${idleCastingTimer}<40) /varset idleCastingTimer ${idleCastingTimerMax}
 
-		/if (${movingTimer}>0 && ${canCastWhileMoving}==FALSE) {
-			/echo Movement detected. Stopping cast.
-			/interrupt
-			/delay 3
-			/return
-		}
+		|/if (${movingTimer}>0 && ${canCastWhileMoving}==FALSE) {
+		|	/echo Movement detected. Stopping cast.
+		|	/interrupt
+		|	/delay 3
+		|	/return
+		|}
 
 		/if (${Me.Casting.ID} != ${castingSpell.ID}) {
 			/vardata untrackedCastSpell Me.Casting
-			/echo Unknown Cast In Progress [${untrackedCastSpell}].
+			|/echo Unknown Cast In Progress [${untrackedCastSpell}].
 			/call castingSetIdle
 		} else {
-			/echo Casting ${castingSpell} as expected...
+			|/echo Casting ${castingSpell} as expected...
 			/varset buffCheckTimer 10
 			/if (${castingTargetID}==${Target.ID}) /call checkCancelConditions
 
 			/if (${Macro.Return}==TRUE) {
-				/echo Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
+				/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
 				/interrupt
 				/delay 3
 				/return
 			}
 		}
+
+		/RETURN RESET
 	}
 
 	/if (${Me.Casting.ID}==NULL) {
 		/if (${castingSpell.ID} != NULL) {
-			/delay 3
-			/echo Detected end of cast for [${castingSpell}] => ${Cast.Result}
-			
+			/echo Detected end of cast for [${castingSpell}]
+
 			/varset sourceArr ${getStackCommandOpt[${castingOpts},SRC]}
 			/varset i ${getStackCommandOpt[${castingOpts},SRCIDX]}
 
+			/if (${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
+				Assuming Success: on ${${sourceArr}[${i},${bName}].Equal[-]}
+			} else {
+				/delay 10
+				/echo Result => ${Cast.Result}
+			}
+			
 			/if (${${sourceArr}[${i},${bNoSitTimer}].NotEqual[-]}) {
 				/echo Pausing medbreak: ${${sourceArr}[${i},${bNoSitTimer}]}
 			}
 		
-			/if (${Cast.Result.Equal[CAST_SUCCESS]}) {
+			/if (${Cast.Result.Equal[CAST_SUCCESS]} || ${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
 				/call castComplete PASS_${Cast.Result}
 			} else {
 				/call castComplete FAIL_${Cast.Result}
@@ -210,7 +218,7 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 		/RETURN onCastFailure FAIL_DISC_NOT_ACTIVATED
 	}
 
-	/bc Casting [${castName}] => ${Spawn[id ${targetID}].CleanName}
+	/echo Casting [${castName}] => ${Spawn[id ${targetID}].CleanName}
 
 	/if (${Twist.Twisting}==TRUE) {
 		/twist stop
@@ -222,7 +230,7 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 		/delay 5
 	} else /if (${castType.Equal[ITEM]}) {
 		/itemnotify "${castName}" rightmouseup
-		/delay 3
+		/delay 10
 	} else {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
 			/twist once ${Me.Gem[${castName}]}

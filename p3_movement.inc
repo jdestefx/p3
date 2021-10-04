@@ -12,30 +12,52 @@ SUB p3_movement_init {
 	/declare anchorXYZ string outer -
 	/declare needRestick bool outer FALSE
 	/declare stickMode string outer -
+	/declare refaceTimer timer outer 0
 
 	/declare stickTargetID int outer 0
 	/declare activeStickFlags string outer
 	/declare activeStickDistance string outer
 	/declare movingTimer timer outer 0
+	/declare fearStartXYZ string outer -
 
 	/declare followStickFlags string outer 			UW
 	/declare followStickDistance string outer 		10
 	/declare meleeStickFlags string outer 			BEHIND MOVEBACK
 	/declare meleeStickDistance string outer 		10
 	/declare followUseNavAssist bool outer 			TRUE
+	/declare fearReturnToStart bool outer 			TRUE
+	/declare feignAutoStand bool outer 				TRUE
 
 	/varset followStickFlags ${getBotIniOption[Misc.FollowStickFlags,${followStickFlags}]}
 	/varset followStickDistance ${getBotIniOption[Misc.FollowStickDistance,${followStickDistance}]}
 	/varset meleeStickFlags ${getBotIniOption[Assist.MeleeStickFlags,${meleeStickFlags}]}
 	/varset meleeStickDistance ${getBotIniOption[Assist.MeleeStickDistance,${meleeStickDistance}]}
 	/varset followUseNavAssist ${getBotIniOption[Assist.FollowUseNavAssist,${followUseNavAssist}]}
+	/varset fearReturnToStart ${getBotIniOption[Misc.FearReturnToStart,${fearReturnToStart}]}
+	/varset feignAutoStand ${getBotIniOption[Misc.AutoStandFromFeign,${feignAutoStand}]}
 
 	/RETURN
 }
 
 
 SUB movementMaintenance() {
-	/if (${Me.Moving}==TRUE) /varset movingTimer 15
+	/if (${Me.Moving}==TRUE) /varset movingTimer 5
+
+	/if (${Me.Feared.ID}!=NULL) {
+		/if (${fearStartXYZ.NotEqual[-]}) /varset fearStartXYZ ${Me.X} ${Me.Y} ${Me.Z}
+	} else {
+		/if (${fearStartXYZ.NotEqual[-]} && ${MathDistanceXYZ[${fearStartXYZ.Replace[ ,,]}]}>20) {
+			/nav locxyz ${fearStartXYZ}
+			/delay 10
+			/RETURN
+		} else {
+			/varset fearStartXYZ -
+		}
+	}
+
+	/if (${Me.Feigning}==TRUE) {
+		/if (${feignAutoStand}==TRUE) /timed 5 /stand
+	}
 
 
 	|/if (${Me.Casting.ID}!=NULL && ${Stick.Active}==TRUE && ${canCastWhileMoving}==FALSE)  {
@@ -65,19 +87,25 @@ SUB movementMaintenance() {
 
 	/if (${stickRoamLockoutTimer}>0) /RETURN
 
-	/if (${Stick.StickTarget}!=${stickTargetID} || ${Stick.Active}==FALSE || ${needRestick}==TRUE || ${Spawn[id ${stickTargetID}].LineOfSight}==FALSE || ${Me.FeetWet}==TRUE && ${feetWetStickTimer}==0) {
-		/if (${Spawn[id ${stickTargetID}].LineOfSight}==FALSE) {
-			/if (${navPlugin}==TRUE && ${followUseNavAssist}==TRUE) {
-				/if (${Stick.Active}==TRUE) /stick off
-				/if (${Nav.Active}==FALSE) /nav id ${stickTargetID}
-			}
-		} else {
-			/if (${Nav.Active}==TRUE) /nav stop
-			/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags} 
-			/stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
-			/varset needRestick FALSE
-			/if (${Me.FeetWet}==TRUE) /varset feetWetStickTimer 40
-		}		
+	/if (${Spawn[id ${stickTargetID}].LineOfSight}==FALSE && ${followUseNavAssist}==TRUE) {
+		/if (${Nav.PathExists[id ${stickTargetID}]}==TRUE) {
+			/if (${Nav.Active}==FALSE) /nav id ${stickTargetID}
+			/RETURN
+		}
+	}
+
+	/if (${Stick.StickTarget}!=${stickTargetID} || ${Stick.Active}==FALSE || ${needRestick}==TRUE || ${Me.FeetWet}==TRUE && ${feetWetStickTimer}==0) {
+		/if (${Nav.Active}==TRUE) /nav stop
+		|/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags} 
+		/stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
+		/varset needRestick FALSE
+		/if (${Me.FeetWet}==TRUE) /varset feetWetStickTimer 40
+	}
+
+	| BECAUSE STICK WILL FREAK OUT ALONG WALLS, RE-FACING THE MOB MAINTAINS PROPER MELEEING
+	/if (${refaceTimer}==0) {
+		/face id ${stickTargetID}
+		/varset refaceTimer 20
 	}
 
 	/RETURN

@@ -144,6 +144,8 @@ SUB EVENT_setAMTags(string line, string newTags)
 		/invoke ${assistTags.Append[${newTags}]}
 		/bc Assist tags are now: ${newTags}
 	}
+
+	/invoke ${cq.Append[TAGSCHANGED;]}
 /RETURN
 
 #event addPASTTags "[#*#(msg)] e3 pastadd #1#"
@@ -161,6 +163,8 @@ SUB EVENT_addPASTTags(string line, string newTags)
 			/bc Adding ${tok} to assist tags.
 		}
 	/next i
+
+	/invoke ${cq.Append[TAGSCHANGED;]}
 /RETURN
 
 
@@ -179,6 +183,8 @@ SUB EVENT_remPASTTags(string line, string remTags)
 			/bc Removed ${tok} from assist tags.
 		}
 	/next i
+
+	/invoke ${cq.Append[TAGSCHANGED;]}
 /RETURN
 
 
@@ -329,6 +335,8 @@ SUB EVENT_adistChange(string line, string newDist)
 
 #EVENT adhocCast "[#1#(msg)] e3 cast #2#@#3#"
 #EVENT adhocCast "<#1#> e3 cast #2#@#3#"
+#EVENT adhocCast "[#1#(msg)] p3 cast #2#@#3#"
+#EVENT adhocCast "<#1#> p3 cast #2#@#3#"
 SUB EVENT_adhocCast(string line, string chatSender, string castName, string castTarget)
 	/varset castName ${castName.Upper}
 
@@ -394,6 +402,7 @@ SUB event_autoMed(string line, string who, string newMode)
 
 #EVENT medOffFromHit "#*# YOU for#*#points of damage."
 SUB EVENT_medOffFromHit
+	|/g I was hit - med off for 20s.
 	/if (${doAutoMed}==TRUE) {
 		/call pauseAutoMed 20s
 	}
@@ -406,3 +415,15 @@ SUB event_expSpammerResponder
 	/call expTrackerNewExp
 /return
 
+
+
+
+#event buffsEnabled "[#1#(msg)] p3 buffs #2#"
+#event buffsEnabled "<#1#> p3 buffs #2#"
+SUB event_buffsEnabled(string line, string who, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset buffsEnabled TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset buffsEnabled FALSE
+	}
+/RETURN

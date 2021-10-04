@@ -45,7 +45,7 @@ SUB validateAssistTags(string tagsToCheck, bool asOrOperator) {
 
 	/if (${asOrOperator}==TRUE && ${matches}>0) {
 		/varset res TRUE
-	} else /if (${matches} >= ${checkTags.Count}) {
+	} else /if (${matches}>0 && ${matches} >= ${checkTags.Count}) {
 		/varset res TRUE
 	} else {
 		/varset res FALSE

@@ -61,19 +61,32 @@ SUB slayMaintenance {
 
 
 SUB scanMobs() {
-	/declare mobCount int local ${SpawnCount[${slaySearch} loc ${Me.X} ${Me.Y}]}
+	/declare mobCount int local
 	/declare i int local
 	/declare xSpawn spawn local
 
 	/invoke ${slayProxMobs.Clear}
 
-	/if (${mobCount}==0) /RETURN
+	/varset mobCount ${SpawnCount[${slaySearch} loc ${Me.X} ${Me.Y}]}
 
-	/for i 1 to ${mobCount}
-		/vardata xSpawn NearestSpawn[${i},${slaySearch}]
-		/if (${xSpawn.Aggressive}==FALSE) /continue
-		/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
-	/next i
+	/if (${mobCount}>0) {
+
+		/for i 1 to ${mobCount}
+			/vardata xSpawn NearestSpawn[${i},${slaySearch}]
+			/if (${xSpawn.Aggressive}==FALSE) /continue
+			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+		/next i
+	}
+
+	/varset mobCount ${SpawnCount[${slaySearch} loc ${Me.X} ${Me.Y} npcpet]}
+	/if (${mobCount}>0) {
+		/echo ${mobCount}
+		/for i 1 to ${mobCount}
+			/vardata xSpawn NearestSpawn[${i},${slaySearch} npcpet]
+			/if (${xSpawn.Aggressive}==FALSE) /continue
+			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+		/next i
+	}
 
 	/RETURN
 }
@@ -130,6 +143,7 @@ SUB checkTankAssignments() {
 		/if (${arrayIndexOf[slayTankStates,:${slayProxMobs.Item[${i}]}]}==NULL) {
 			/varset slayTankStates[${freeTankIndex}] ${freeTankName}:${mobID}
 			/bct ${freeTankName} assist on ${mobID}
+			/BC ${freeTankName} slay on ${mobID}
 		}
 	/next i
 
