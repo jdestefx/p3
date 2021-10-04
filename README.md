@@ -2,7 +2,8 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
 *** IF YOU WANT TO PLAY WITH AN ALPHA VERSION, GET P3A.MAC FROM http://hh.destef.com/download/p3/  --- YOU **must** CREATE A "p3_bots" SUBFOLDER IN YOUR MACROS FOLDER. ***
 
-::P3 FEATURE STATUS:::
+
+:::P3 FEATURE STATUS:::
 
     MELEE
         [X] BASIC STICKING/ATTACKING
@@ -14,15 +15,14 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [X] AUTO-RETREAT
         [X] RETURN TO CAMP SPOT
       * [X] ADIST SETTINGS BY PERCENT
-
+        [ ] TANKING/AGGRO-ABILITIES
 
     HEALS
         [X] BASIC HEALING
         [X] CAST TEAMS (AKA HEAL-TEAM/)
         [ ] PANIC HEALING
         [X] XTARGET HEALS
-        [ ] MY PET HEALS 
-     *  [ ] OTHER NETBOTS' PET HEALS
+        [X] PET HEALS (ANY NETBOT PET WILL BE CHECKED)
         [ ] AUTO-REZ
 
     BUFFS
@@ -47,7 +47,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [X] ALTERNATIVE INI SUPPORT
         [X] BASIC STICK/FOLLOW/STOP
         [X] TAGS (AKA PAST TAGS)
-        [ ] AUTO-TRAP DISARM
+        [x] AUTO-TRAP DISARM (TRAP NAMES ARE HARD CODED)
         [ ] AUTOMATIC DISPELLING
         [x] AD-HOC CAST ORDERS
         [X] AUTO EQBCS CHANNELS
@@ -55,7 +55,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [ ] TELL RELAY
         [x] ROAM/AUTO-FOLLOW (NAV)
         [ ] MQ2FPS AUTO SETTINGS
-        [ ] AUTO STAND FROM FEIGN
+        [x] AUTO STAND FROM FEIGN (on/off)
         [x] EXPERIENCE REPORTS
         [X] AUTO-NETBOTS SETTINGS
         [X] STARTUP PAST TAGS
@@ -70,13 +70,11 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
 
     CONSIDER/RECONSIDER
-        [ ] OPTIMIZE TAGS BY ENABLE/DISABLE SPELL ENTRIES UPON TAG CHANGES
       * [ ] INTEGRATED CH ROT
       * [ ] PET CLASS AUTO SUMMON
       * [ ] PET CLASS PET TOYS
       * [ ] ROGUE HIDE/SNEAK 
         [ ] OPTIMIZE STARTUP BY PRE-COMPUTING @ CLASSES
-        [ ] OPTIMIZE HEALS BY PRE-BUILDING HEAL LIST
+
 
     * NEW FUNCTIONALITY
-
