@@ -15,7 +15,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [X] AUTO-RETREAT
         [X] RETURN TO CAMP SPOT
       * [X] ADIST SETTINGS BY PERCENT
-        [ ] TANKING/AGGRO-ABILITIES
+        [x] TANKING/AGGRO-ABILITIES
 
     HEALS
         [X] BASIC HEALING
@@ -23,7 +23,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [ ] PANIC HEALING
         [X] XTARGET HEALS
         [X] PET HEALS (ANY NETBOT PET WILL BE CHECKED)
-        [ ] AUTO-REZ
+        [x] AUTO-REZ (still buggy)
 
     BUFFS
         [X] BASIC BUFFS
@@ -32,7 +32,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
       * [X] BUFF OPTIONS INTO OWN INI SECTION
 
     COMBAT SPELLS
-        [ ] BASIC NUKING/DOTTING
+        [x] BASIC NUKING/DOTTING
         [ ] CHARMING
         [ ] AUTO-MEZ
         [ ] AUTO-DEBUFFING
