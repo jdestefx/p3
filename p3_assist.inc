@@ -2,6 +2,7 @@ SUB p3_assist_init {
 	/call p3RegisterCommand STOP assistStop 50
 	/call p3RegisterCommand FOLLOW assistFollow 50
 	/call p3RegisterCommand KILL assistKill 50
+	/call p3RegisterCommand KILL assistKillLockCheck 1
 
 	/declare assistSpawnID int outer 0
 	/declare combatStateCheckTimer timer outer 0
@@ -9,6 +10,8 @@ SUB p3_assist_init {
 	/declare combatStateTimerMax int outer 50
 	/declare combatStateLongTimer timer outer 0
 	/declare combatStateLongTimerMax int outer 150
+	/declare assistTime timer outer 0
+	/declare assistLock bool outer FALSE
 
 	/declare autoAssistHoldTimer timer outer 0
 	/declare autoAssistCheckTimer timer outer 0
@@ -28,9 +31,26 @@ SUB p3_assist_init {
 	/RETURN
 }
 
+SUB assistKillLockCheck(string cmd, string opts) {
+	/if (${assistLock}==TRUE) /return -1
+	/RETURN
+}
+
 SUB assistKill(string cmd, string opts) {
+
 	/varset assistSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
-	
+	/varset assistTime 1200s
+
+	/declare lock string local
+	/varset lock ${getStackCommandOpt[${opts},LOCK]}
+	/echo ${lock}
+
+	/if (${lock.NotEqual[-]}) {
+		/echo .
+		/bc locking on ${assistSpawnID}
+		/varset assistLock TRUE
+	}
+
 	/RETURN
 }
 
@@ -44,6 +64,9 @@ SUB assistStop(string cmd, string opts) {
 	|/varset combatStateTimer 5
 
 	/varset assistSpawnID 0
+	/varset assistTime 0
+	/varset assistLock FALSE
+
 	/RETURN
 }
 
@@ -134,3 +157,4 @@ SUB updateCombatStateTimer() {
 	/next i
 	/RETURN
 }
+

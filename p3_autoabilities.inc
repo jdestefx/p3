@@ -41,6 +41,10 @@ SUB checkAutoAbilities() {
 			/if (${Me.PctHPs} >= ${iniAutoAbilities[${i},${bSelfUnderHP}]}) /continue
 		}
 
+		/if (${iniAutoAbilities[${i},${bSelfOverHP}].NotEqual[-]}) {
+			/if (${Me.PctHPs} < ${iniAutoAbilities[${i},${bSelfUnderHP}]}) /continue
+		}
+
 		/if (${iniAutoAbilities[${i},${bRequireAssistTarget}].NotEqual[-]}) {
 			/if (${assistTarget}==0) /continue
 		}
@@ -59,3 +63,4 @@ SUB checkAutoAbilities() {
 
 	/RETURN
 }
+

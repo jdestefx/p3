@@ -29,9 +29,11 @@ SUB bardtwistNewTwist(string cmd, string opts) {
 	/declare newOrder string local ${getStackCommandOpt[${opts},ORDER]}
 
 	/if (${Twist.Twisting}==TRUE) /twist ${newOrder}
+	/varset twistOrder ${newOrder}
 
 	/call writeBotIniOption Bard.TwistOrder "${newOrder}"
 	/bc New twist: ${newOrder} (saved to ini)
 
 	/RETURN
 }
+

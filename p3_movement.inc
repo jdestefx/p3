@@ -6,7 +6,7 @@ SUB p3_movement_init {
 	/call p3RegisterCommand RAISEANCHOR movementRaiseAnchor 55
 	/call p3RegisterCommand ROAMMOVESTART movementRoamMoveStart 45
 
-
+	/declare stickLockoutTimer timer outer 0
 	/declare stickRoamLockoutTimer timer outer 0
 	/declare feetWetStickTimer timer outer 0
 	/declare anchorXYZ string outer -
@@ -59,12 +59,6 @@ SUB movementMaintenance() {
 		/if (${feignAutoStand}==TRUE) /timed 5 /stand
 	}
 
-
-	|/if (${Me.Casting.ID}!=NULL && ${Stick.Active}==TRUE && ${canCastWhileMoving}==FALSE)  {
-	|	/stick off
-	|	/RETURN
-	|}
-
 	/if (${stickTargetID}==0) {
 		/if (${Stick.Active}==TRUE) /stick off
 		/RETURN
@@ -85,6 +79,7 @@ SUB movementMaintenance() {
 		/RETURN
 	}
 
+	/if (${stickLockoutTimer}>0) /RETURN
 	/if (${stickRoamLockoutTimer}>0) /RETURN
 
 	/if (${Spawn[id ${stickTargetID}].LineOfSight}==FALSE && ${followUseNavAssist}==TRUE) {
@@ -111,6 +106,17 @@ SUB movementMaintenance() {
 	/RETURN
 }
 
+SUB movementLockoutStick(string t) {
+	/if (${Stick.Active}==TRUE) {
+		/stick off
+		/moveto stop
+		/delay 5
+	}
+	
+	/varset stickLockoutTimer ${t}
+	/ECHO LOCKING OUT STICK FOR ${t}
+	/RETURN
+}
 
 SUB movementRoamMoveStart(string cmd, string opts) {
 	/echo lockout stick!

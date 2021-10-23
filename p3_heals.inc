@@ -2,6 +2,7 @@ SUB p3_heals_init {
 	/call p3RegisterCommand TAGSCHANGED healsTagsChanged 50
 	
 
+	/declare healsEnabled bool outer TRUE
 	/declare healCheckTimer timer outer 0
 	/declare teamIndex int outer 0
 	/declare enableteamIndex bool outer TRUE
@@ -21,11 +22,11 @@ SUB p3_heals_init {
 
 	/declare autoRezEnabled bool outer FALSE
 	/declare autoRezSpells string outer NONE
-	/declare autoRezRequireHealIndex int outer 0
+	/declare autoRezRequireTeamIndex int outer 0
 
 	/varset autoRezEnabled ${getBotIniOption[Misc.AutoRezEnabled,${autoRezEnabled}]}
 	/varset autoRezSpells ${getBotIniOption[Misc.AutoRezSpells,${autoRezSpells}]}
-	/varset autoRezRequireHealIndex ${getBotIniOption[Misc.AutoRezTeamIndex,${autoRezRequireHealIndex}]}
+	/varset autoRezRequireTeamIndex ${getBotIniOption[Misc.AutoRezTeamIndex,${autoRezRequireTeamIndex}]}
 
 	/varset castTeamNetbots ${getBotIniOption[CastTeam.Members,${castTeamNetbots}]}
 	/invoke ${castTeamNetbotsList.Append[${castTeamNetbots.Upper}]}
@@ -44,12 +45,18 @@ SUB healsTagsChanged() {
 }
 
 SUB healsMaintenance() {
+	/if (${healsEnabled}==FALSE) /RETURN
+
+	/if (${castTeamNetbots.NotEqual[NONE]} &&  ${Math.Calc[${Time.Second} % 5]}==0 && ${checkTeamIndexTimer}==0) {
+		/varset checkTeamIndexTimer 5s
+		/call determineTeamIndex
+	}
 
 	/if (${healCheckTimer}==0) {
 		/varset healCheckTimer 5
-
-		/call determineTeamIndex
 		
+		/call determineTeamIndex
+
 		/if (${Me.Casting.ID}!=NULL) /return
 		/if (${Me.Invis}==TRUE) /RETURN
 		/if (${Me.Silenced.ID}!=NULL) /RETURN
@@ -89,9 +96,6 @@ SUB checkHeals {
 	/declare actionTaken bool local FALSE
 
 	/invoke ${botBuffIDs.Delimiter[ ]}
-
-	/echo my team index: ${teamIndex}
-
 
 	/call refreshHealTables
 
@@ -176,7 +180,15 @@ SUB checkHeals {
 		/if (${iniHeals[${i},${bHealPct}].NotEqual[-]}) /varset healPct ${iniHeals[${i},${bHealPct}]}
 
 		/call getSpellFromCastRequest "${healSpellName}"
-		/vardata healSpell ${Macro.Return}
+		/if (${Macro.Return.Equal[UNKNOWN]}) {
+			/bc Warning: checkHeals() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
+			/RETURN
+		} else /if (${Macro.Return.Equal[ABILITY]}) {
+			/bc Warning: checkHeals() Abilities are not allowed as heal entries.
+			/RETURN
+		} else {
+			/vardata healSpell ${Macro.Return}
+		}
 
 		/if (${healSpell.TargetType.Equal[Self]}) {
 			/if (${Me.PctHPs}>${healPct}) /continue
@@ -194,7 +206,6 @@ SUB checkHeals {
 
 			/echo healspawn: ${Macro.Return}
 			/vardata healSpawn Spawn[=${Macro.Return}]
-
 		}
 
 		/varset healLockoutTimerName heal_${healSpawn.ID}_${healSpellName}
@@ -267,8 +278,10 @@ SUB refreshHealTables {
 		/if (${NetBots[${netbotName}].State.Equal[DEAD]}==TRUE || ${NetBots[${netbotName}].State.Equal[STUN]} && ${NetBots[${netbotName}].CurrentHPs} < -1) /continue
 		/if (${NetBots[${netbotName}].Invulnerable}==1) /continue
 
+		|/echo add: ${netbotName}
 		/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PctHPs}]}:${netbotName}:1]}
 		/invoke ${trackIDs.Append[${NetBots[${netbotName}].ID}]}
+
 
 		/if (${NetBots[${netbotName}].PetID}!=NULL) {
 			/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PetHP}]}:${Spawn[id ${NetBots[${netbotName}].PetID}].CleanName}:8]}
@@ -393,11 +406,9 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 		/varset m ${e.Token[3,:]}
 		/varset hp ${e.Token[1,:]}
 
-		|/echo eval: ${name} ${hp} ${mask} & ${m} 
-
 		/if (${hp}>${pctHP}) /continue
 
-		|/if (${Math.Calc[${mask}&${m}]}==0) /continue
+		/if (${Math.Calc[${mask}&${m}]}==0) /continue
 
 		/if (${m} == 1 && ${iniHeals[${iniIndex},${bTargets}].NotEqual[-]}) {
 			/if (${Select[${name},${iniHeals[${iniIndex},${bTargets}]}]}==0) /continue
@@ -580,9 +591,6 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 SUB determineTeamIndex
 	/if (${castTeamNetbots.Equal[NONE]}) /return
 
-	/if (${checkTeamIndexTimer}>0) /return
-	/varset checkTeamIndexTimer 5s
-
 	/declare i int local
 	/declare j int local
 	/declare entryCount int local ${castTeamNetbotsList.Count}
@@ -606,10 +614,10 @@ SUB determineTeamIndex
 		/varset entryName ${castTeamNetbotsList.Item[${i}]}
 		/varset entryName ${entryName.Left[1]}${entryName.Right[-1].Lower}
 
-		/varset myManaAmount ${Me.CurrentMana}
-		/varset entryManaAmount ${NetBots[${entryName}].CurrentMana}
-		|/varset myManaAmount ${Me.PctMana}
-		|/varset entryManaAmount ${NetBots[${entryName}].PctMana}
+		|/varset myManaAmount ${Me.CurrentMana}
+		|/varset entryManaAmount ${NetBots[${entryName}].CurrentMana}
+		/varset myManaAmount ${Me.PctMana}
+		/varset entryManaAmount ${NetBots[${entryName}].PctMana}
 
 		| ARE THEY CASTING SOMETHING? BUMP ME UP
 		|/if (${Bool[${NetBots[${entryName}].Casting}]}==TRUE) {
@@ -639,6 +647,7 @@ SUB determineTeamIndex
 		}
 	/next i
 
+	|/echo my team index: ${teamIndex}
 
 /RETURN
 
@@ -649,6 +658,7 @@ SUB checkAutoRez() {
 	/if (${Stick.Active}==TRUE) /RETURN
 	/if (${Me.Silenced.ID}!=NULL) /RETURN
 	/if (${Me.Invis}==TRUE) /RETURN
+	/if (${Me.Casting.ID}!=NULL) /RETURN
 
 	/declare xSpawnID int local
 	/declare corpseSearch string local pccorpse radius 150
@@ -656,29 +666,35 @@ SUB checkAutoRez() {
 	/declare x int local
 	/declare allcorpses[100] spawn local
 	/declare corpseCount int local
+	/declare readyRezSpell string local
 
-	/if (${autoRezRequireHealIndex}!=0) {
-		/if (${healIndex}<${autoRezRequireHealIndex}) /return
+
+	/if (${autoRezRequireTeamIndex}!=0) {
+		/if (${teamIndex}<${autoRezRequireTeamIndex}) /return
 	}
+
+	/call getReadyRezSpell
+	/varset readyRezSpell ${Macro.Return}
+	/if (${readyRezSpell.Equal[-]}) /return
+	/if (${isCastReady[${readyRezSpell}]}==FALSE) /return
 
 	/vardata corpseCount SpawnCount[${corpseSearch}]
 	/if (${corpseCount}==0) /return FALSE
 
 	/for x 1 to ${corpseCount}
+		/echo check: rez_${NearestSpawn[${x},${corpseSearch}].ID}  ${NearestSpawn[${x},${corpseSearch}]}
 		/if (${isLockoutExpired[rez_${NearestSpawn[${x},${corpseSearch}].ID}]}==FALSE) {
 			/continue
 		} else {
 			/varset xSpawnID ${NearestSpawn[${x},${corpseSearch}].ID}
+			/break
 		}
 	/next x
 
 	/if (${xSpawnID}==NULL) /return
-	
-	/call getReadyRezSpell
-	/if (${Macro.Return.Equal[-]}) /return
 
 	/bc AutoRez:  ${xSpawnID} ${Spawn[id ${xSpawnID}].Name}
-	/invoke (${cq.Append[CAST;SPELL=${Macro.Return};TARGETID=${xSpawnID};ONRESULT=onRestCastResult;]})
+	/invoke (${cq.Append[CAST;SPELL=${readyRezSpell};TARGETID=${xSpawnID};ONRESULT=onRestCastResult;]})
 	
 	/RETURN
 }
@@ -689,7 +705,6 @@ SUB onRestCastResult(string result, string opts) {
 	/if (${result.Find[PASS_]}!=NULL) {
 		/echo create lockout: rez_${xSpawnID}
 		/call lockout rez_${xSpawnID} 45s
-
 	}
 	
 	/RETURN
@@ -714,3 +729,4 @@ SUB getReadyRezSpell() {
 
 	/RETURN -
 }
+

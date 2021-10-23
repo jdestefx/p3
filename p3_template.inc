@@ -1,9 +1,10 @@
-SUB p3_medbreak_init() {
+SUB p3_template_init() {
 	
 	/RETURN
 }
 
 
-SUB medbreakMaintenance() {
+SUB templateMaintenance() {
 	
 }
+

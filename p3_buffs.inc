@@ -135,7 +135,13 @@ SUB checkBuffs {
 		/varset buffCastName ${iniBuffs[${i},${bName}]}
 
 		/call getSpellFromCastRequest "${buffCastName}"
-		/vardata buffSpell ${Macro.Return}
+		/if (${Macro.Return.Equal[UNKNOWN]}) {
+			/bc Warning: checkBuffs() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
+			/RETURN
+		} else {
+			/vardata buffSpell ${Macro.Return}
+		}
+
 		/varset buffSpellID ${buffSpell.ID}
 		
 		/if (${iniBuffs[${i},${bForceSpellID}].NotEqual[-]}) {

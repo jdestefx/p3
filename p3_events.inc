@@ -10,6 +10,7 @@ SUB EVENT_followMe(string line, string chatSender, string opts) {
 }
 
 #event stop "<#1#> e3 stop"
+#event stop "<#1#> p3 stop"
 SUB EVENT_stop(string line, string chatSender) {
 	/invoke ${cq.Append[STOP;AUTHOR=${chatSender};ASSISTHOLDTIMER=50]}
 	/RETURN
@@ -25,6 +26,16 @@ SUB event_kill(string line, string chatSender, string spawnID) {
 	/RETURN
 }
 
+#event killLock "[#1#(msg)] p3 killlock #2#"
+#event killLock "<#1#> p3 killlock #2#"
+#event killLock "[#1#(msg)] assistlock on #2#"
+#event killLock "<#1#> assistlock on #2#"
+
+SUB event_killLock(string line, string chatSender, string spawnID) {
+	/echo ${spawnID}
+	/invoke ${cq.Append[KILL;AUTHOR=${chatSender};SPAWNID=${spawnID};LOCK=YES;]}
+	/RETURN
+}
 
 
 #Event buffRequest "#*# tells you, '#2# #1#'" 
@@ -392,6 +403,8 @@ SUB EVENT_stopRoam(string line, string spawnSearch)
 #event autoMed "[#1#(msg)] p3 automed #2#"
 #event autoMed "<#1#> p3 automed #2#"
 SUB event_autoMed(string line, string who, string newMode)
+	/if (${ignoreAutoMed}==TRUE) /return
+
 	/if (${newMode.Upper.Equal[ON]}) {
 		/call setAutoMed TRUE
 	} else /if (${newMode.Upper.Equal[OFF]}) {
@@ -400,9 +413,8 @@ SUB event_autoMed(string line, string who, string newMode)
 /RETURN
 
 
-#EVENT medOffFromHit "#*# YOU for#*#points of damage."
+#EVENT medOffFromHit "#*# YOU for#*#points of dam#*#"
 SUB EVENT_medOffFromHit
-	|/g I was hit - med off for 20s.
 	/if (${doAutoMed}==TRUE) {
 		/call pauseAutoMed 20s
 	}
@@ -426,4 +438,48 @@ SUB event_buffsEnabled(string line, string who, string newMode)
 	} else /if (${newMode.Upper.Equal[OFF]}) {
 		/varset buffsEnabled FALSE
 	}
+/RETURN
+
+
+#event tauntSuccess "You capture #*# attention!"
+#event tauntSuccess "You capture #*# with your unparalleled reproach!"
+SUB EVENT_tauntSuccess(string line, string newMode)
+   /if (${Target.ID}==NULL) /return
+   
+   /invoke ${tauntSuccessList.Append[${Target.ID}_${MacroQuest.Running}]}
+/RETURN
+
+
+
+
+#EVENT autoRezToggle "#*#p3 autorez #1#"
+SUB event_autoRezToggle(string line, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset autoRezEnabled TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset autoRezEnabled FALSE
+	} else {
+		/bc Unknown AutoRez mode. Use ON or OFF.
+		/return
+	}
+
+	/bc AutoRez is now: ${newMode}.
+
+/RETURN
+
+
+
+#EVENT toggleHeals "#*#p3 heals #1#"
+SUB event_toggleHeals(string line, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset healsEnabled TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset healsEnabled FALSE
+	} else {
+		/bc Unknown Heals mode. Use ON or OFF.
+		/return
+	}
+
+	/bc HealsEnabled is now: ${newMode}.
+
 /RETURN

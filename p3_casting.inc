@@ -122,6 +122,7 @@ SUB castingMaintenance() {
 			
 			/if (${${sourceArr}[${i},${bNoSitTimer}].NotEqual[-]}) {
 				/echo Pausing medbreak: ${${sourceArr}[${i},${bNoSitTimer}]}
+				/call pauseAutoMed ${${sourceArr}[${i},${bNoSitTimer}]}
 			}
 		
 			/if (${Cast.Result.Equal[CAST_SUCCESS]} || ${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
@@ -190,71 +191,76 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/declare castType string local
 	/declare castSpell spell local
 	/declare bardWasTwisting bool local FALSE
-	/declare castItemName string local 
 	/declare ret string local
-
-	/call getSpellFromCastRequest "${castName}"
-	/vardata castSpell ${Macro.Return}
-
-	/if (${isCastReady[${castName}]}==FALSE) /RETURN FAIL_CAST_NOT_READY
-
-	/if (${Spawn[id ${targetID}].LineOfSight}==FALSE && ${castSpell.SpellType.Find[Detri]}) /RETURN FAIL_LOS
+	/declare hasCastTime bool local true
 
 	/call getCastTypeByCastRequest "${castName}"
 	/if (${Macro.Return.Equal[UNKNOWN]}) /RETURN FAIL_UNKNOWN_SPELL
-
 	/varset castType ${Macro.Return}
 
-	/if (${castType.Equal[ITEM]}) {
-		/varset castItemName ${FindItem[${castName}].Spell.Name}
+	| CHECK ABILITIES AND HANDLE RIGHT AWAY SINCE THEY DONT HAVE "SPELLS" 
+	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
+
+	| ALL OTHER CAST TYPES INVOLVE SPELLS
+	/call getSpellFromCastRequest "${castName}"
+
+	/if (${Macro.Return.Equal[UNKNOWN]}) {
+		| UNKNOWN is probably a combat ability like taunt, can allow.
+	} else /if (${Macro.Return.NotEqual[ABILITY]}) {
+		/vardata castSpell ${Macro.Return}
+		/if (${Spawn[id ${targetID}].LineOfSight}==FALSE && ${castSpell.SpellType.Find[Detri]}) /RETURN FAIL_LOS
 	}
 
-	/if (${castType.Equal[DISCIPLINE]}) {
-		/if (${Me.ActiveDisc.ID}!=NULL) /RETURN FAIL_DISC_IN_PROGRESS
+	/if (${isCastReady[${castName}]}==FALSE) /RETURN FAIL_CAST_NOT_READY
+
+	/if (${castType.Equal[ALTABILITY]} && ${AltAbility[${castName}].Spell.CastTime}==0) /varset hasCastTime FALSE
+	/if (${castType.Equal[ITEM]} && ${FindItem[=${castName}].CastTime}==0) /varset hasCastTime FALSE
+	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
+	/if (${castType.Equal[DISCIPLINE]}) /varset hasCastTime FALSE
+
+	/echo Casting/Doing [${castName}] => ${Spawn[id ${targetID}].CleanName}
+
+	/if (${hasCastTime}==TRUE) {
+		/if (${canCastWhileMoving}==FALSE) {
+			/call movementLockoutStick 1s
+		}
+
+		/if (${Twist.Twisting}==TRUE) {
+			/twist stop
+			/delay 3
+		}
+	}
+
+
+	/if (${castType.Equal[ABILITY]}) {
+		/doability ${Me.Ability[${castName}]}
+		/RETURN PASS_INSTANT_CAST
+	
+	} else /if (${castType.Equal[DISCIPLINE]}) {
 		/disc ${castName}
-		/delay 5
-		/if (${Me.ActiveDisc.ID}!=NULL) /RETURN PASS_DISC_ACTIVATED
+		/RETURN PASS_INSTANT_CAST	
 
-		/RETURN onCastFailure FAIL_DISC_NOT_ACTIVATED
-	}
-
-	/echo Casting [${castName}] => ${Spawn[id ${targetID}].CleanName}
-
-	/if (${Twist.Twisting}==TRUE) {
-		/twist stop
-		/delay 3
-	}
-
-	/if (${castType.Equal[ALTABILITY]}) {
+	} else /if (${castType.Equal[ALTABILITY]}) {
 		/alt act ${AltAbility[${castName}].ID}
-		/delay 5
+		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
+
 	} else /if (${castType.Equal[ITEM]}) {
 		/itemnotify "${castName}" rightmouseup
-		/delay 10
-	} else {
+		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
+
+	} else /if (${castType.Equal[SPELL]}) {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
 			/twist once ${Me.Gem[${castName}]}
 		} else {
 			/cast "${castName}"
 		}
-		/delay 3
 	}
 
+	/delay 5
 
 	/varset ret PASS_CAST_STARTED
 
-	/if (${castType.Equal[ITEM]} && ${FindItem[=${castName}].CastTime}==0) {
-		/varset ret PASS_INSTANT_CAST
-	}
-
-	/if (${castType.Equal[ITEM]} && ${FindItem[=${castName}].CastTime}>=0) {
-		/varset ret PASS_CAST_STARTED
-	}
-
-	/if (${castType.NotEqual[ITEM]} && ${castSpell.CastTime}==0) /varset ret PASS_INSTANT_CAST
-
 	/RETURN ${ret}
-
 }
 
 SUB castComplete(string result) {

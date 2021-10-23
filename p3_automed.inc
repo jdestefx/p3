@@ -75,6 +75,8 @@ SUB pauseAutoMed(string waitTime) {
 	}
 
 	/varset medLockoutTimer ${waitTime}
+	/bc Stopping automed for ${waitTime}
 	/if (${Me.Sitting}==TRUE) /stand
 	/RETURN
 }
+

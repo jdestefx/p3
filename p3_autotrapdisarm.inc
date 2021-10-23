@@ -66,3 +66,4 @@ SUB checkAutoDisarm() {
 
    /RETURN
 }
+

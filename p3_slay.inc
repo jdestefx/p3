@@ -24,7 +24,7 @@ SUB p3_slay_init {
 	/varset slaySearch npc los radius ${slayRadius} range ${slayLevelRange} ${slayExtra}
 
 	/if (${amSlayLeader}==TRUE) {
-		/varset slayEnabled TRUE
+		|/varset slayEnabled TRUE
 		/call clearTankStates
 	}
 
@@ -206,3 +206,4 @@ SUB slayBuildTeam() {
 
 	/RETURN
 }
+

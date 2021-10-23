@@ -3,7 +3,7 @@ SUB p3_assist_tags_init {
 	/declare tempCombatTags list outer
 
 	/if (${commandLine[${cmdPAST}].Length}>0) {
-		/bc Adding PAST tags from startup: ${commandLine[${cmdPAST}].Replace[ ,]}
+		|/bc Adding PAST tags from startup: ${commandLine[${cmdPAST}].Replace[ ,]}
 		/invoke ${assistTags.Append[${commandLine[${cmdPAST}].Replace[ ,]}]}
 	}
 

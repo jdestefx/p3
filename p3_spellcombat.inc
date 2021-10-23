@@ -180,11 +180,13 @@ SUB checkCombatSpells {
 		}
 
 		/call getSpellFromCastRequest "${cSpellName}"
-		/vardata cSpell ${Macro.Return}
-
-		/if (${isLockoutExpired[detriTimer_${cSpell.ID}]}==FALSE) /continue
-		/if (${isLockoutExpired[detriTimer_${spellKillID}_${cSpell.ID}]}==FALSE) /continue
-
+		/if (${Macro.Return.Equal[UNKNOWN]}) {
+			/bc Warning: checkCombatSpells() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
+		} else {
+			/vardata cSpell ${Macro.Return}
+			/if (${isLockoutExpired[detriTimer_${cSpell.ID}]}==FALSE) /continue
+			/if (${isLockoutExpired[detriTimer_${spellKillID}_${cSpell.ID}]}==FALSE) /continue
+		}
 
 		/invoke (${cq.Append[CAST;SPELL=${cSpellName};TARGETID=${spellKillID};CANCELCONDITIONS=${cancelConditions};SRC=combatSpells;SRCIDX=${i};ONRESULT=onCombatCastResult]})
 		/break
@@ -251,3 +253,4 @@ SUB onCombatCastResult(string result, string opts) {
 
 	/RETURN
 }
+

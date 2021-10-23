@@ -1,6 +1,6 @@
 SUB p3_global_init {
 	/declare autoKeywordIgnoreValues ON,OFF,YES,NO,NONE
-	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests
+	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions
 	/declare debugMode bool outer FALSE
 	/declare botIniFile string outer -
 	/declare allNetbotNames string outer
@@ -13,13 +13,19 @@ SUB p3_global_init {
 	/declare bcsChannels string outer	${getDefaultBCSChannels[]}
 	/varset bcsChannels 				${getBotIniOption[Misc.EQBCSChannels,${bcsChannels}]}
 
-	/bc bccmd channels ${bcsChannels}
+	/ECHO bccmd channels ${bcsChannels}
 	/bccmd channels ${bcsChannels}
 
 	/RETURN
 }
 
 SUB globalMaintenance() {
+
+	/if (${Me.Dead}==TRUE || ${Me.State.Equal[HOVER]}) {
+		/delay 10
+		/RETURN RESET
+	}
+
 	/RETURN
 }
 
@@ -59,7 +65,7 @@ SUB loadIniSections {
 
 SUB initializeIniTags {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bBurnKey,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bBurnKey,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -308,6 +314,24 @@ SUB characterPassesAllowKey(string charName, string allowKey) {
 	/RETURN
 }
 
+SUB characterPassesAllowKeySeries(string charName, string series) {
+	/declare i int local 0
+	/declare ikey string local
+
+	/for i 1 to ${Math.Calc[${series.Count[,]}+1]}
+		/varset ikey ${series.Token[${i},,]}
+
+		/if (${ikey.Left[1].Equal[@]}) {
+			/call characterPassesAllowKey ${charName} ${ikey}
+			/if (${Macro.Return}==TRUE) /return TRUE
+		} else {
+			/if (${charName.Upper.Equal[${ikey.Upper}]}) /return TRUE
+		}
+	/next i
+
+	/return FALSE
+}
+
 SUB gatherNetbotNames {
 	/declare i int local 
 	/declare netbotCount int local ${Math.Calc[${NetBots.Counts}]}
@@ -474,3 +498,4 @@ SUB fullTarget(int targetID) {
 
 	/RETURN
 }
+

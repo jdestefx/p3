@@ -20,6 +20,7 @@
 #include p3_automed.inc
 #include p3_exptrack.inc
 #include p3_autotrapdisarm.inc
+#include p3_tank.inc
 #include p3_mine.inc
 
 #turbo 120
@@ -39,7 +40,7 @@ SUB MAIN {
 	/declare et int local
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,assist,exptrack,automed,heals,movement,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,mine]}
+	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,assist,tank,exptrack,automed,heals,movement,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -79,10 +80,8 @@ SUB checkMaintenance {
 		/varset et ${MacroQuest.Running}
 		/varset p3_${modules.Item[${i}]}_perftime ${Math.Calc[${p3_${modules.Item[${i}]}_perftime} + (${et}-${st})]}
 
-		/if (${Macro.Return.Equal[RESET]}) {
-			|/echo Loop reset requested... (from ${modules.Item[${i}]}Maintenance)
-			/break
-		}
+		/if (${Macro.Return.Equal[RESET]}) /break
+		
 	/next i
 
 	/RETURN
@@ -106,6 +105,10 @@ SUB checkCommandQueue {
 	} else {
 		/for i 0 to ${Math.Calc[ ${commandStack${root}.Count}-1 ]}
 			/call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
+			/if (${Macro.Return}==-1) {
+				/echo FALSE caught. Abanoning chain: ${commandStack${root}.Item[${i}].Token[2,:]}
+				/break
+			}
 		/next i
 	}
 
@@ -260,7 +263,7 @@ SUB p3RegisterCommand(string cmd, string funcName, string order) {
 SUB getStackCommandOpt (string opts, string k) {
 
 	/declare sp int local ${opts.Find[;${k}=]}
-	/declare ret string local - 
+	/declare ret string local -
 
 	/if (${sp}!=NULL) {
 		/varset ret ${opts.Right[-${sp}].Token[1,;].Token[2,=]}
@@ -284,7 +287,7 @@ SUB getBotIniOption(string opt, string defaultResponse) {
 	} else {
 		/if (${iniValue.Upper.Equal[ON]} || ${iniValue.Upper.Equal[YES]} || ${iniValue.Upper.Equal[TRUE]}) {
 			/RETURN TRUE
-		} else /if (${iniValue.Upper.Equal[OFF]} || ${iniValue.Upper.Equal[FALSE]} || ${iniValue.Upper.Equal[NO]}) {
+		} else /if (${iniValue.Upper.Equal[OFF]} || ${iniValue.Upper.Equal[FALSE]} || ${iniValue.Upper.Equal[NO]} || ${iniValue.Upper.Equal[NONE]} || ${iniValue.Upper.Equal[-]}) {
 			/RETURN FALSE
 		} else {
 			/RETURN ${iniValue}
@@ -308,7 +311,9 @@ SUB getSpellFromCastRequest(string castRequest) {
 		/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
 		/return CombatAbility[${combatAbilityIndex}]
 	}
-	/RETURN NULL
+	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
+
+	/RETURN UNKNOWN
 }
 
 SUB isLockoutExpired(string timerName) {
@@ -366,8 +371,10 @@ SUB isCastReady(string request) {
 	/if (${castType.Equal[ALTABILITY]} && ${Me.AltAbilityReady[${request}]}==FALSE) /return FALSE
 	/if (${castType.Equal[ITEM]} && ${Me.ItemReady[${request}]}==FALSE) /return FALSE
 	/if (${castType.Equal[SPELL]} && ${Me.SpellInCooldown}==TRUE && ${Me.Class.ShortName.NotEqual[BRD]}) /return FALSE
+	/if (${castType.Equal[DISCIPLINE]} && ${Me.ActiveDisc.ID}!=NULL) /return FALSE
 	/if (${castType.Equal[DISCIPLINE]} && ${Me.CombatAbilityReady[${request}]}==FALSE) /return FALSE
-
+	/if (${castType.Equal[ABILITY]} && ${Me.AbilityReady[${Me.Ability[${request}]}]}==FALSE) /return FALSE
+	
 	/return TRUE
 }
 
@@ -376,6 +383,7 @@ SUB getCastTypeByCastRequest(string castRequest) {
 	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
 	/if (${Spell[${castRequest}].ID}) /return SPELL
 	/if (${FindItemCount[${castRequest}]}) /return ITEM
+	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 	/RETURN UNKNOWN
 }
 
@@ -402,8 +410,12 @@ SUB iniSectionExists(string sectionName) {
 SUB getSpellDurationByRequestName(string castRequest) {
 	/declare s spell local
 	/call getSpellFromCastRequest "${castRequest}"
+	/if (${Macro.Return.Equal[UNKNOWN]}) /RETURN 0
+	/if (${Macro.Return.Equal[ABILITY]}) {
+		/bc Warning: getSpellDurationByRequestName() performed against an ABILITY. Defaulting to 3 seconds.
+		/RETURN 3
+	}
 
-	/if (${Macro.Return.Equal[NULL]}) /return 0
 	/vardata s ${Macro.Return}
 
 	/RETURN ${s.MyDuration.TotalSeconds}
@@ -413,7 +425,6 @@ SUB getSpellDurationByRequestName(string castRequest) {
 SUB MathDistanceXYZ(string x, string y, string z) {
 	/RETURN ${Math.Distance[${y} ${x} ${z}]}
 }
-
 
 SUB checkOpenWindows() {
 	/if (${Window[BigBankWnd].Open})    /return TRUE
