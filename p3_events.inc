@@ -48,6 +48,7 @@ SUB EVENT_buffRequest(string line, string who, string msg)
 	/declare queueEntry string local
 	/declare repeatBuff int local 0
 
+	/if (${brSameGuildOnly}==TRUE && ${Me.Guild.Length}==0) /RETURN
 	/if (${brSameGuildOnly}==TRUE && ${Spawn[=${who}].Guild.Length}==0) /RETURN
 	/if (${brSameGuildOnly}==TRUE && ${Spawn[=${who}].Guild.NotEqual[${Me.Guild}]}) /RETURN
 
