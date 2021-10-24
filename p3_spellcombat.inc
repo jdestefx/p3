@@ -103,8 +103,19 @@ SUB checkCombatSpells {
 			/if (${Me.PctMana} <= ${iniCombatSpells[${i},${bSelfOverMana}]}) /continue
 		}
 
+		/if (${iniCombatSpells[${i},${bSelfUnderHP}].NotEqual[-]}) {
+			/if (${Me.PctHPs} >= ${iniCombatSpells[${i},${bSelfUnderHP}]}) /continue
+		}
+
+		/if (${iniCombatSpells[${i},${bSelfOverHP}].NotEqual[-]}) {
+			/if (${Me.PctHPs} < ${iniCombatSpells[${i},${bSelfOverHP}]}) /continue
+		}
+
 		/if (${iniCombatSpells[${i},${bSelfUnderMana}].NotEqual[-]}) {
 			/if (${Me.PctMana} >= ${iniCombatSpells[${i},${bSelfUnderMana}]}) /continue
+		}
+		/if (${iniCombatSpells[${i},${bSelfOverMana}].NotEqual[-]}) {
+			/if (${Me.PctMana} < ${iniCombatSpells[${i},${bSelfOverMana}]}) /continue
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfUnderEnd}].NotEqual[-]}) {

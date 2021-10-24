@@ -194,6 +194,8 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/declare ret string local
 	/declare hasCastTime bool local true
 
+	/echo cast: ${castName}
+
 	/call getCastTypeByCastRequest "${castName}"
 	/if (${Macro.Return.Equal[UNKNOWN]}) /RETURN FAIL_UNKNOWN_SPELL
 	/varset castType ${Macro.Return}

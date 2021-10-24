@@ -368,6 +368,11 @@ SUB onBuffCastResult(string result, string opts) {
 	/declare i int local ${getStackCommandOpt[${opts},SRCIDX]}
 	/declare targetID int local ${getStackCommandOpt[${opts},TARGETID]}
 	/declare buffSpellID ${getStackCommandOpt[${opts},BUFFSPELLID]}
+	/declare targetName string ${Spawn[id ${targetID}]}
+
+	/if (${NetBots[${targetName}].ID}!=NULL) {
+		/bct ${targetName} //netnote
+	}
 
 	/if (${iniBuffs[${i},${bNoSitTimer}].NotEqual[-]}) {
 		/call pauseAutoMed ${iniBuffs[${i},${bNoSitTimer}]}

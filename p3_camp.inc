@@ -5,8 +5,10 @@ SUB p3_camp_init {
 	/declare campEnabled bool outer FALSE
 	/declare campStartZoneID int outer 
 	/declare campX int outer
-	/declare campY int outer	
+	/declare campY int outer
 	/declare campZ int outer
+
+	/declare campSpawnName string outer -
 
 	/RETURN
 }
@@ -37,6 +39,12 @@ SUB checkCamp() {
 
 	/if (${Stick.Active}==TRUE || ${Navigation.Active}==TRUE) /RETURN
 	/if (${combatStateTimer}>0) /RETURN
+
+	/if (${campSpawnName.NotEqual[-]}) {
+		/varset campX ${Spawn[=${campSpawnName}].X}
+		/varset campY ${Spawn[=${campSpawnName}].Y}
+		/varset campZ ${Spawn[=${campSpawnName}].Z}
+	}
 
 	/if (${Math.Distance[${campY}, ${campX}, ${campZ}]}>15) {
 		/if (${Navigation.MeshLoaded}==TRUE && ${Navigation.Active}==FALSE && ) {

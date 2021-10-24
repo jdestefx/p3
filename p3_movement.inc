@@ -169,6 +169,7 @@ SUB setActiveStickParams(string mode) {
 	/if (${mode.Equal[MELEE]}) {
 		/varset activeStickFlags ${meleeStickFlags}
 		/varset activeStickDistance ${meleeStickDistance}
+		/if (${tankModeEnabled}==TRUE) /varset activeStickFlags ${activeStickFlags.Replace[BEHIND,]}
 	} else /if (${mode.Equal[FOLLOW]}) {
 		/varset activeStickFlags ${followStickFlags}
 		/varset activeStickDistance ${followStickDistance}

@@ -274,8 +274,11 @@ SUB EVENT_buildSlayTeam(string line, string newMode) {
 #EVENT campCommand "[#1#(msg)] e3 camp #2#"
 #EVENT campCommand "<#1#> e3 camp #2#"
 SUB EVENT_campCommand(string line, string source, string newMode)
-	/if (${Spawn[${source}].ID}==NULL) {
-		/bc Can't find "${source}" to use as the camp location.
+	/if (${Spawn[=${newMode}].ID}!=NULL) {
+		/bc Using ${newMode} as camp location.
+		/varset campSpawnName ${newMode}
+		/varset campEnabled TRUE
+		/varset campStartZoneID ${Zone.ID}		
 		/return
 	}
 	
@@ -285,6 +288,7 @@ SUB EVENT_campCommand(string line, string source, string newMode)
 	}
 
 	/if (${newMode.Upper.Equal[HERE]}) {
+		/varset campSpawnName -
 		/varset campX ${Spawn[${source}].X}
 		/varset campY ${Spawn[${source}].Y}
 		/varset campZ ${Spawn[${source}].Z}
@@ -294,6 +298,7 @@ SUB EVENT_campCommand(string line, string source, string newMode)
 	}
 
 	/if (${newMode.Upper.Equal[THERE]}) {
+		/varset campSpawnName -
 		/varset campX ${Me.X}
 		/varset campY ${Me.Y}
 		/varset campZ ${Me.Z}
@@ -483,3 +488,4 @@ SUB event_toggleHeals(string line, string newMode)
 	/bc HealsEnabled is now: ${newMode}.
 
 /RETURN
+

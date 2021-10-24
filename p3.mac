@@ -305,7 +305,7 @@ SUB writeBotIniOption(string opt, string value) {
 
 SUB getSpellFromCastRequest(string castRequest) {
 	/if (${FindItemCount[=${castRequest}]}>0) /return FindItem[=${castRequest}].Spell
-	/if (${Spell[${castRequest}].ID}) /return Spell[${castRequest}]
+	/if (${Me.Spell[${castRequest}].ID}) /return Spell[${castRequest}]
 	/if (${Me.AltAbility[${castRequest}].ID}) /return Me.AltAbility[${castRequest}].Spell
 	/if (${Me.CombatAbility[${castRequest}]}) { 
 		/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
@@ -381,7 +381,7 @@ SUB isCastReady(string request) {
 SUB getCastTypeByCastRequest(string castRequest) {
 	/if (${Me.AltAbility[${castRequest}].ID}) /return ALTABILITY
 	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
-	/if (${Spell[${castRequest}].ID}) /return SPELL
+	/if (${Me.Spell[${castRequest}].ID}) /return SPELL
 	/if (${FindItemCount[${castRequest}]}) /return ITEM
 	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 	/RETURN UNKNOWN
