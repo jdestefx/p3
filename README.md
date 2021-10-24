@@ -7,35 +7,37 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
     MELEE
         [X] BASIC STICKING/ATTACKING
-        [X] COMBAT ABILITIES (KICK, TIGER CLAW, MEND, ETC) 
+        [X] COMBAT ABILITIES (KICK, TIGER CLAW, MEND, BASH ETC) 
         [X] AUTO-ASSIST
         [ ] BURNS
         [X] AUTO-OFFTANKING v2.0 (AKA SLAY)
         [ ] RANGED/BOW ATTACKING
         [X] AUTO-RETREAT
         [X] RETURN TO CAMP SPOT
+        [x] RETURN TO CAMP (USING A SPAWN AS CAMP LOCATION)
       * [X] ADIST SETTINGS BY PERCENT
         [x] TANKING/AGGRO-ABILITIES
 
     HEALS
         [X] BASIC HEALING
-        [X] CAST TEAMS (AKA HEAL-TEAM/)
+        [X] CAST TEAMS (AKA HEAL-TEAM)
         [ ] PANIC HEALING
         [X] XTARGET HEALS
         [X] PET HEALS (ANY NETBOT PET WILL BE CHECKED)
-        [x] AUTO-REZ (still buggy)
+        [x] AUTO-REZ (NEEDS MORE TESTING BUT WORKS)
 
     BUFFS
-        [X] BASIC BUFFS
-        [X] CAST TEAM SUPPORT (AKA HEAL-TEAM FOR BUFFS)
+        [X] BUFFS
         [X] BUFF REQUESTS
       * [X] BUFF OPTIONS INTO OWN INI SECTION
+        [x] BUFF RESPOND ONLY TO SAME GUILD
 
     COMBAT SPELLS
-        [x] BASIC NUKING/DOTTING
+        [x] SINGLE TARGET NUKING/DOTTING
+        [ ] MULTI TARGET NUKING/DOTTING
         [ ] CHARMING
         [ ] AUTO-MEZ
-        [ ] AUTO-DEBUFFING
+        [X] SINGLE TARGET AUTO-DEBUFFING
 
     BARD TWIST
       * [x] MACRO-CONTROLLED TWISTING
@@ -56,7 +58,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [x] ROAM/AUTO-FOLLOW (NAV)
         [ ] MQ2FPS AUTO SETTINGS
         [x] AUTO STAND FROM FEIGN (on/off)
-        [x] EXPERIENCE REPORTS
+        [x] EXPERIENCE REPORTS (SAY GAIN % ON KILL)
         [X] AUTO-NETBOTS SETTINGS
         [X] STARTUP PAST TAGS
         [X] STARTUP PLUGIN CHECKING
@@ -64,7 +66,6 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
     TODO
         [ ] DIVINE ARB IS A SELF-TYPE THUS NOT CHECKING NETBOTS
-        [ ] CHECK SPELL ENTRIES FOR COMBAT-ABILITIES AND WARN ACCORDINGLY
         [ ] INVESTIGATE PET HEALS BEING SPAMMED 
         [ ] FIND A WAY TO DETECT FAILED INSTANT CLICK ITEMS (AON NOT STACKING WITH ILLUSION)
 
