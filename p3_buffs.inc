@@ -91,6 +91,9 @@ SUB checkBuffs {
 			/if (${Macro.Return}==FALSE) /continue
 		}
 
+		/if (${iniBuffs[${i},${bMyName}].NotEqual[-]}) {
+			/if (${Me.CleanName.Upper.NotEqual[${iniBuffs[${i},${bMyName}].Upper}]}) /continue
+		}
 		/if (${iniBuffs[${i},${bNotIfMounted}].NotEqual[-]}) {
 			/if (${Me.Mount.ID}!=NULL) /continue
 		}

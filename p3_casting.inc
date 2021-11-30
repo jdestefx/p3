@@ -42,7 +42,7 @@ SUB castingFollow(string cmd, string opts) {
 }
 
 SUB castingStop(string cmd, string opts) {
-	/if (${Me.Casting.ID}!=NULL) {
+	/if (${Me.Casting.ID}!=NULL && ${amBard}==FALSE) {
 		/echo stop cast seen.
 		/interrupt
 	}
@@ -74,7 +74,10 @@ SUB castingMaintenance() {
 	/declare sourceArr string local
 	/declare i int local
 
-	/if (${Twist.Twisting}==TRUE) /return
+	/if (${Twist.Twisting}==TRUE && ${Me.Casting.ID}==${castingSpell.ID}) {
+		/if (${Cast.Timing}==0) /twist off
+		/RETURN RESET
+	}
 
 	/if (${Me.Casting.ID}!=NULL) {
 		/if (${idleCastingTimer}<40) /varset idleCastingTimer ${idleCastingTimerMax}
@@ -91,7 +94,7 @@ SUB castingMaintenance() {
 			|/echo Unknown Cast In Progress [${untrackedCastSpell}].
 			/call castingSetIdle
 		} else {
-			|/echo Casting ${castingSpell} as expected...
+			/echo Casting ${castingSpell} as expected...
 			/varset buffCheckTimer 10
 			/if (${castingTargetID}==${Target.ID}) /call checkCancelConditions
 
@@ -99,11 +102,11 @@ SUB castingMaintenance() {
 				/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
 				/interrupt
 				/delay 3
-				/return
+				/RETURN RESET
 			}
 		}
 
-		/RETURN RESET
+		/if (${amBard}==FALSE) /RETURN RESET
 	}
 
 	/if (${Me.Casting.ID}==NULL) {
@@ -116,7 +119,7 @@ SUB castingMaintenance() {
 			/if (${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
 				Assuming Success: on ${${sourceArr}[${i},${bName}].Equal[-]}
 			} else {
-				/delay 10
+				/delay 5
 				/echo Result => ${Cast.Result}
 			}
 			
@@ -252,6 +255,7 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 
 	} else /if (${castType.Equal[SPELL]}) {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
+			|/CAST ${Me.Gem[${castName}]}
 			/twist once ${Me.Gem[${castName}]}
 		} else {
 			/cast "${castName}"

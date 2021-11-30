@@ -1,5 +1,12 @@
-#event followMe "<#1#> e3 follow me #2#"
 #event followMe "<#1#> e3 follow me"
+#event followMe "<#1#> e3 follow me #2#"
+
+#event followMe "<#1#> p3 follow me"
+#event followMe "<#1#> p3 follow me #2#"
+
+#event followMe "[#1#(msg)] p3 follow me"
+#event followMe "[#1#(msg)] p3 follow me #2#"
+
 SUB EVENT_followMe(string line, string chatSender, string opts) {
 	/if (${Defined[opts]}==FALSE) /declare opts string local ${defaultStickOpts}
 
@@ -22,6 +29,7 @@ SUB EVENT_stop(string line, string chatSender) {
 #event kill "<#1#> assist on #2#"
 
 SUB event_kill(string line, string chatSender, string spawnID) {
+	/if (${assistLock}==TRUE) /RETURN
 	/invoke ${cq.Append[KILL;AUTHOR=${chatSender};SPAWNID=${spawnID}]}
 	/RETURN
 }
@@ -163,11 +171,13 @@ SUB EVENT_setAMTags(string line, string newTags)
 	/invoke ${cq.Append[TAGSCHANGED;]}
 /RETURN
 
-#event addPASTTags "[#*#(msg)] e3 pastadd #1#"
-#event addPASTTags "<#*#> e3 pastadd #1#"
+#event addPASTTags "[#*#(msg)] p3 pastadd #1# #2#"
+#event addPASTTags "<#*#> p3 pastadd #1# #2#"
 #event addPASTTags "[#*#(msg)] p3 pastadd #1#"
 #event addPASTTags "<#*#> p3 pastadd #1#"
-SUB EVENT_addPASTTags(string line, string newTags)
+SUB EVENT_addPASTTags(string line, string newTags, string dur)
+	/echo here: ${newTags}|${dur}
+
 	/declare i int local 
 	/declare tok string local
 
@@ -176,10 +186,15 @@ SUB EVENT_addPASTTags(string line, string newTags)
 		/if (${assistTags.Contains[${tok.Lower}]}==FALSE) {
 			/invoke ${assistTags.Append[${tok}]}
 			/bc Adding ${tok} to assist tags.
+			/if (${Defined[dur]}==TRUE) {
+				/call lockout past_${tok} ${dur}
+				/echo adding lockout for ${tok} => ${dur}
+			}
 		}
 	/next i
 
 	/invoke ${cq.Append[TAGSCHANGED;]}
+	/doevents flush addPASTTags
 /RETURN
 
 
@@ -188,18 +203,7 @@ SUB EVENT_addPASTTags(string line, string newTags)
 #event remPASTTags "[#*#(msg)] p3 pastrem #1#"
 #event remPASTTags "<#*#> p3 pastrem #1#"
 SUB EVENT_remPASTTags(string line, string remTags)
-	/declare i int local 
-	/declare tok string local
-
-	/for i 1 to ${Math.Calc[${remTags.Count[,]}+1]}
-		/varset tok ${remTags.Token[${i},,]}
-		/if (${assistTags.Contains[${tok.Lower}]}==TRUE) {
-			/invoke ${assistTags.Remove[${tok}]}
-			/bc Removed ${tok} from assist tags.
-		}
-	/next i
-
-	/invoke ${cq.Append[TAGSCHANGED;]}
+	/call removePastTags "${remTags}"
 /RETURN
 
 
@@ -314,7 +318,6 @@ SUB EVENT_campCommand(string line, string source, string newMode)
 /RETURN
 
 
-
 #event retreatHere "[#1#(msg)] p3 retreat #2#"
 #event retreatHere "<#1#> p3 retreat #2#"
 SUB event_retreatHere(string line, string who, string newMode)
@@ -324,7 +327,6 @@ SUB event_retreatHere(string line, string who, string newMode)
 		/invoke ${cq.Append[RETREATOFF;]}
 	}
 /RETURN
-
 
 
 #event anchorHere "[#1#(msg)] p3 anchor #2#"
@@ -339,6 +341,7 @@ SUB event_anchorHere(string line, string who, string newMode)
 	}
 /RETURN
 
+#event adistChange "#*#tells the raid, 'p3 adist #1#'"
 #event adistChange "[#*#(msg)] p3 adist #1#"
 #event adistChange "<#*#> p3 adist #1#"
 #event adistChange "[#*#(msg)] e3 adist #1#"
@@ -459,8 +462,6 @@ SUB EVENT_tauntSuccess(string line, string newMode)
 /RETURN
 
 
-
-
 #EVENT autoRezToggle "#*#p3 autorez #1#"
 SUB event_autoRezToggle(string line, string newMode)
 	/if (${newMode.Upper.Equal[ON]}) {
@@ -472,7 +473,7 @@ SUB event_autoRezToggle(string line, string newMode)
 		/return
 	}
 
-	/bc AutoRez is now: ${newMode}.
+	/bc AutoRezEnabled is now: ${newMode}.
 
 /RETURN
 
@@ -493,3 +494,44 @@ SUB event_toggleHeals(string line, string newMode)
 
 /RETURN
 
+
+#EVENT toggleAutoMez "#*#p3 automez #1#"
+SUB event_toggleAutoMez(string line, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset autoMezEnabled TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset autoMezEnabled FALSE
+	} else {
+		/bc Unknown autoMezEnabled mode. Use ON or OFF.
+		/return
+	}
+
+	/bc AutoMezEnabled is now: ${newMode}.
+	/em shrugs.
+
+/RETURN
+
+
+
+
+#EVENT mezBroke "#1# has been awakened by#*#"
+SUB EVENT_mezBroke(string line, string mobName)
+   /declare i int local
+   /declare mob spawn local
+
+   /declare mobCount int local ${SpawnCount[=${mobName}]}
+
+   | FIND THE CORRECT MOB. INITIATE A RE-MEZ BY REMOVING FROM MEZLIST AND LET MEZ CHECK FIND IT AGAIN
+   /for i 1 to ${mobCount}
+      /vardata mob NearestSpawn[${i},=${mobName}]
+      /if (${autoMezList.Index[${mob.ID}]}!=-1) {
+         /tar id ${mob.ID}
+         /delay 10
+         /if (${Target.Mezzed.ID}==NULL) {
+            /invoke ${autoMezList.Erase[${autoMezList.Index[${mob.ID}]}]}
+				/call wipeLockout mez_${mob.ID}
+            /return
+         }
+      }
+   /next i
+/RETURN

@@ -130,6 +130,9 @@ SUB checkHeals {
 		|	/if (${Macro.Return}==FALSE) /continue
 		|}
 
+		/if (${iniHeals[${i},${bMyName}].NotEqual[-]}) {
+			/if (${Me.CleanName.Upper.NotEqual[${iniHeals[${i},${bMyName}].Upper}]}) /continue
+		}
 
 		/if (${iniHeals[${i},${bRequireTeamIndex}].NotEqual[-]}) {
 			/if (${teamIndex}!=${iniHeals[${i},${bRequireTeamIndex}]}) /continue
@@ -205,6 +208,9 @@ SUB checkHeals {
 			/if (${Macro.Return.Equal[-]}) /continue
 
 			/echo healspawn: ${Macro.Return}
+			/if (${Macro.Return.Length}==0) {
+				/echo ${getHealthTableIndex} ${healMask} ${healPct} ${i}
+			}
 			/vardata healSpawn Spawn[=${Macro.Return}]
 		}
 
@@ -694,13 +700,13 @@ SUB checkAutoRez() {
 	/if (${xSpawnID}==NULL) /return
 
 	/bc AutoRez:  ${xSpawnID} ${Spawn[id ${xSpawnID}].Name}
-	/invoke (${cq.Append[CAST;SPELL=${readyRezSpell};TARGETID=${xSpawnID};ONRESULT=onRestCastResult;]})
+	/invoke (${cq.Append[CAST;SPELL=${readyRezSpell};TARGETID=${xSpawnID};ONRESULT=onRezCastResult;]})
 	
 	/RETURN
 }
 
 
-SUB onRestCastResult(string result, string opts) {
+SUB onRezCastResult(string result, string opts) {
 
 	/if (${result.Find[PASS_]}!=NULL) {
 		/echo create lockout: rez_${xSpawnID}

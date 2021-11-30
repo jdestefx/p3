@@ -12,10 +12,37 @@ SUB p3_assist_tags_init {
 
 
 
-SUB assist_tagsMaintenance {
+SUB assist_tagsMaintenance() {
+	/call checkExpiringTags
+
 	/RETURN
 }
 
+
+SUB checkExpiringTags() {
+
+	/declare i int local
+	/declare tName string local
+
+	/if (${assistTags.Count}==0) /RETURN
+	|/echo count: ${assistTags.Count}
+
+	/for i 0 to ${Math.Calc[${assistTags.Count}-1]}
+		/varset tName ${assistTags.Item[${i}]}
+		|/echo checking: ${tName}...
+
+		/if (${Defined[past_${tName}]}==TRUE) {
+			/if (${past_${tName}}==0) {
+				/echo detected expired tag: ${tName} -- should remove
+				/call wipeLockout past_${tName}
+				/call removePastTags ${tName}
+				/return
+			}
+		}
+	/next i
+
+	/RETURN
+}
 
 SUB validateAssistTags(string tagsToCheck, bool asOrOperator) {
 	/declare i int local
@@ -56,4 +83,19 @@ SUB validateAssistTags(string tagsToCheck, bool asOrOperator) {
 	/RETURN
 }
 
+SUB removePastTags(string remTags) {
+	/declare i int local 
+	/declare tok string local
 
+	/for i 1 to ${Math.Calc[${remTags.Count[,]}+1]}
+		/varset tok ${remTags.Token[${i},,]}
+		/if (${assistTags.Contains[${tok.Lower}]}==TRUE) {
+			/invoke ${assistTags.Remove[${tok}]}
+			/bc Removed ${tok} from assist tags.
+		}
+	/next i
+
+	/invoke ${cq.Append[TAGSCHANGED;]}
+
+	/RETURN
+}

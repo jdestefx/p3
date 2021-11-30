@@ -21,6 +21,12 @@ SUB p3_global_init {
 
 SUB globalMaintenance() {
 
+
+	/if (${checkOpenWindows[]}==TRUE) {
+		/delay 10
+		/RETURN RESET
+	}
+
 	/if (${Me.Dead}==TRUE || ${Me.State.Equal[HOVER]}) {
 		/delay 10
 		/RETURN RESET
@@ -28,6 +34,8 @@ SUB globalMaintenance() {
 
 	/RETURN
 }
+
+
 
 SUB loadIniSections {
 	/declare sections string local ${Ini[${botIniFile}]}
@@ -65,7 +73,7 @@ SUB loadIniSections {
 
 SUB initializeIniTags {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bBurnKey,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bBurnKey,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -440,9 +448,7 @@ SUB isNetBotAttackingID(int targetID) {
 
 	/for i 1 to ${netbotCount}
 		/varset netbotName ${NetBots.Client[${i}]}	
-		/if (${NetBots[${netbotName}].Attacking}==TRUE && ${NetBots[${netbotName}].TargetID}==${targetID}) {
-			/return TRUE
-		}
+		/if (${NetBots[${netbotName}].Attacking}==TRUE && ${NetBots[${netbotName}].TargetID}==${targetID}) /return TRUE
 	/next i
 
 	/RETURN FALSE
@@ -489,9 +495,16 @@ SUB getDefaultBCSChannels() {
 }
 
 SUB fullTarget(int targetID) {
+
+	/tar id ${targetID}
+	/delay 10
+
+	/RETURN
+
+	/target clear
+	/delay 2
 	
-	/while (${Target.BuffsPopulated}==0) {
-		/if (${Spawn[id ${targetID}].ID}==NULL || ${Spawn[id ${targetID}].Dead}==TRUE) /RETURN FALSE
+	/while (${Target.BuffsPopulated}==0 && ${Target.BuffsPopulated}!=NULL) {
 		/if (${Target.ID}!=${targetID}) /tar id ${targetID}
 		/delay 1
 	}
@@ -499,3 +512,12 @@ SUB fullTarget(int targetID) {
 	/RETURN
 }
 
+
+SUB checkOpenWindows() {
+	/if (${Window[BigBankWnd].Open})	 /return TRUE
+	/if (${Window[TradeWnd].Open})		/return TRUE
+	/if (${Window[GuildBankWnd].Open})  /return TRUE
+	/if (${Window[MerchantWnd].Open})	/return TRUE
+	/if (${Window[SpellBookWnd].Open})  /return TRUE
+	/return FALSE
+}

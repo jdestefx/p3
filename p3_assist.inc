@@ -2,7 +2,8 @@ SUB p3_assist_init {
 	/call p3RegisterCommand STOP assistStop 50
 	/call p3RegisterCommand FOLLOW assistFollow 50
 	/call p3RegisterCommand KILL assistKill 50
-	/call p3RegisterCommand KILL assistKillLockCheck 1
+	/call p3RegisterCommand KILL assistKillNameCheck 1
+	/call p3RegisterCommand KILL assistKillLockCheck 5
 
 	/declare assistSpawnID int outer 0
 	/declare combatStateCheckTimer timer outer 0
@@ -12,6 +13,8 @@ SUB p3_assist_init {
 	/declare combatStateLongTimerMax int outer 150
 	/declare assistTime timer outer 0
 	/declare assistLock bool outer FALSE
+	/declare assistMustHaveName string outer -
+	/declare assistMustNotHaveName string outer -
 
 	/declare autoAssistHoldTimer timer outer 0
 	/declare autoAssistCheckTimer timer outer 0
@@ -26,27 +29,45 @@ SUB p3_assist_init {
 	/varset autoAssistPercent		${getBotIniOption[Assist.AutoAssistPercent,${autoAssistPercent}]}
 	/varset maxAssistDistance 		${getBotIniOption[Assist.MaxAssistDistance,${maxAssistDistance}]}
 	/varset useAutoFire 			${getBotIniOption[Assist.UseAutoFire,${useAutoFire}]}
+	/varset assistMustHaveName 		${getBotIniOption[Assist.MustHaveName,${assistMustHaveName}]}
+	/varset assistMustNotHaveName 	${getBotIniOption[Assist.MustNotHaveName,${assistMustNotHaveName}]}
 	/varset useEQCombatIndicator	${getBotIniOption[Misc.CombatStateUsesGameIndicator,${useEQCombatIndicator}]}
 
 	/RETURN
 }
 
+SUB assistKillNameCheck(string cmd, string opts) {
+	/declare checkSpawnID int local
+
+
+	/if (${assistMustHaveName.NotEqual[FALSE]}) {
+		/varset checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
+		/if (${Spawn[id ${checkSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) /RETURN RESET
+	}
+
+	/if (${assistMustNotHaveName.NotEqual[FALSE]}) {
+		/varset checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
+		/if (${Spawn[id ${checkSpawnID}].CleanName.Upper.Find[${assistMustNotHaveName.Upper}]}!=NULL) /RETURN RESET
+	}
+
+	/RETURN
+}
+
 SUB assistKillLockCheck(string cmd, string opts) {
-	/if (${assistLock}==TRUE) /return -1
+	|/if (${assistLock}==TRUE) /RETURN RESET
 	/RETURN
 }
 
 SUB assistKill(string cmd, string opts) {
-
 	/varset assistSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
 	/varset assistTime 1200s
 
+	/if (${Spawn[id ${assistSpawnID}].Distance}>${maxAssistDistance}) /RETURN RESET
+
 	/declare lock string local
 	/varset lock ${getStackCommandOpt[${opts},LOCK]}
-	/echo ${lock}
 
 	/if (${lock.NotEqual[-]}) {
-		/echo .
 		/bc locking on ${assistSpawnID}
 		/varset assistLock TRUE
 	}
@@ -81,6 +102,19 @@ SUB assistMaintenance() {
 
 	/if (${assistSpawnID}!=0) {
 		/if (${Spawn[id ${assistSpawnID}].ID}==NULL || ${Spawn[id ${assistSpawnID}].Dead}==TRUE) /call assistStop
+		
+		/if (${assistMustHaveName.NotEqual[FALSE]}) {
+			/if (${Spawn[id ${assistSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) {
+				/call assistStop
+				/RETURN
+			}
+		}
+		/if (${assistMustNotHaveName.NotEqual[FALSE]}) {
+			/if (${Spawn[id ${assistSpawnID}].CleanName.Upper.Find[${assistMustNotHaveName.Upper}]}!=NULL) {
+				/call assistStop
+				/RETURN
+			}
+		}
 	}
 
 	/call checkAutoAssist
@@ -107,6 +141,7 @@ SUB checkAutoAssist() {
 		/if (${NetBots[${netbotName}].Attacking}==FALSE) /continue
 		/if (${NetBots[${netbotName}].TargetID}==0) /continue
 		/if (${Spawn[id ${NetBots[${netbotName}].TargetID}].Dead}==TRUE) /continue
+		/if (${Spawn[pc ${netbotName}].Distance} > ${maxAssistDistance}) /continue
 
 		/if (${Spawn[id ${NetBots[${netbotName}].TargetID}].Type.NotEqual[PC]} && ${NetBots[${netbotName}].TargetHP}<=${autoAssistPercent}) {
 			/varset targetID ${NetBots[${netbotName}].TargetID}

@@ -30,12 +30,19 @@ SUB checkAdhocCastList() {
 	/if (${Me.Invis}==TRUE) /return
 	/if (${Stick.Active}==TRUE || ${Nav.Active}==TRUE) /return
 
+	/for i ${Math.Calc[${adhocCastList.Count}-1]} downto 0
+		/varset targetID ${adhocCastList.Item[${i}].Token[2,_]}
+		/if (${Spawn[id ${targetID}].ID}==NULL || ${Spawn[id ${targetID}].Dead}==TRUE) {
+			/invoke ${adhocCastList.Erase[${i}]}
+		}
+	/next i
+
 	/for i 0 to ${Math.Calc[${adhocCastList.Count}-1]}
 		/varset castName ${adhocCastList.Item[${i}].Token[1,_]}
 		/varset targetID ${adhocCastList.Item[${i}].Token[2,_]}
 
 		/if (${isCastReady[${castName}]}==FALSE) /continue
-		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};ONRESULT=onAdhocCastResult;ADHOCINDEX=${i};]})
+		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};ONRESULT=onAdhocCastResult;ADHOCINDEX=${i};CANCELCONDITIONS=TARGETDEAD;]})
 		/varset adHocCastPendingTimer 10s
 		/varset actionTaken TRUE
 		/break
@@ -50,6 +57,7 @@ SUB onAdhocCastResult(string result, string opts) {
 	/declare removeIndex string local ${getStackCommandOpt[${opts},ADHOCINDEX]}
 	
 	/if (${result.Find[PASS_]}!=NULL) {
+		/ECHO .
 		/invoke ${adhocCastList.Erase[${removeIndex}]}
 	}
 

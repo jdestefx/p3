@@ -21,6 +21,8 @@
 #include p3_exptrack.inc
 #include p3_autotrapdisarm.inc
 #include p3_tank.inc
+#include p3_automez.inc
+#include p3_autodispell.inc
 #include p3_mine.inc
 
 #turbo 120
@@ -40,7 +42,7 @@ SUB MAIN {
 	/declare et int local
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,assist,tank,exptrack,automed,heals,movement,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,mine]}
+	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,movement,automez,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -105,7 +107,7 @@ SUB checkCommandQueue {
 	} else {
 		/for i 0 to ${Math.Calc[ ${commandStack${root}.Count}-1 ]}
 			/call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
-			/if (${Macro.Return}==-1) {
+			/if (${Macro.Return.Equal[RESET]}) {
 				/echo FALSE caught. Abanoning chain: ${commandStack${root}.Item[${i}].Token[2,:]}
 				/break
 			}
@@ -177,6 +179,14 @@ SUB p3Setup {
 	/declare tankClasses string outer WAR,PAL,SHD
 	/declare knightClasses string outer PAL,SHD
 	/declare canCastWhileMoving bool outer ${Me.Class.ShortName.Equal[BRD]}
+	/declare amBard bool outer ${Me.Class.ShortName.Equal[BRD]}
+
+	/declare cfNone int outer 0
+	/declare cfMoving int outer 1
+	/declare cfNaving int outer 2
+	/declare cfSticking int outer 4
+	/declare cfCasting int outer 8
+	/declare cfInvis int outer 16
 
 	/RETURN
 }
@@ -244,6 +254,7 @@ SUB checkPlugins () {
 }
 
 SUB p3RegisterCommand(string cmd, string funcName, string order) {
+	/varset order ${strPad[${order}]}
 	/varset cmd ${cmd.Upper}
 	/declare stackName string local commandStack${cmd}
 
@@ -305,11 +316,12 @@ SUB writeBotIniOption(string opt, string value) {
 
 SUB getSpellFromCastRequest(string castRequest) {
 	/if (${FindItemCount[=${castRequest}]}>0) /return FindItem[=${castRequest}].Spell
-	/if (${Me.Spell[${castRequest}].ID}) /return Spell[${castRequest}]
+	/if (${Spell[${castRequest}].ID}) /return Spell[${castRequest}]
 	/if (${Me.AltAbility[${castRequest}].ID}) /return Me.AltAbility[${castRequest}].Spell
-	/if (${Me.CombatAbility[${castRequest}]}) { 
-		/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
-		/return CombatAbility[${combatAbilityIndex}]
+	/if (${Me.CombatAbility[${castRequest}]}) {
+		/return Spell[${castRequest}]
+		|/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
+		|/return CombatAbility[${combatAbilityIndex}]
 	}
 	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 
@@ -364,8 +376,9 @@ SUB isCastReady(string request) {
 	/if (${Me.Silenced.ID}!=NULL) /return FALSE
 
 	/if (${castType.Equal[SPELL]}) {
+		/if (${Me.Class.ShortName.Equal[BRD]} && ${Me.SpellInCooldown}==TRUE) /RETURN TRUE
 		/if (${Me.SpellReady[${request}]}==FALSE) /RETURN FALSE
-		/if (${Me.CurrentMana}<${Me.Spell[${request}].Mana}) /RETURN FALSE
+		/if (${Me.CurrentMana}<${Spell[${request}].Mana}) /RETURN FALSE
 	}
 
 	/if (${castType.Equal[ALTABILITY]} && ${Me.AltAbilityReady[${request}]}==FALSE) /return FALSE
@@ -381,7 +394,7 @@ SUB isCastReady(string request) {
 SUB getCastTypeByCastRequest(string castRequest) {
 	/if (${Me.AltAbility[${castRequest}].ID}) /return ALTABILITY
 	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
-	/if (${Me.Spell[${castRequest}].ID}) /return SPELL
+	/if (${Spell[${castRequest}].ID}) /return SPELL
 	/if (${FindItemCount[${castRequest}]}) /return ITEM
 	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 	/RETURN UNKNOWN
@@ -434,3 +447,45 @@ SUB checkOpenWindows() {
 	/if (${Window[SpellBookWnd].Open})  /return TRUE
 	/return FALSE
 }
+
+SUB clearStackActions(string action) {
+	
+	/declare i int local
+
+	/if (${cq.Count}==0) /return
+
+	/for i ${Math.Calc[${cq.Count}-1]} downto 0
+		/if (${cq.Item[${i}].Token[1,;].Equal[${action}]}) {
+			/invoke ${cq.Erase[${i}]}
+		}
+	/next i
+
+	/RETURN
+}
+
+#Event OMMMask "#*#You feel a gaze of deadly power focusing on you#*#"
+	Sub EVENT_OMMMask
+		/rs IT'S ME!!!!  (CH rot may miss a beat)
+
+		/if (${Me.Class.ShortName.Equal[BRD]}) {
+			/twist off
+			/delay 3
+		}
+		
+		/if (${Cast.Timing}>1) {
+			/interrupt
+			/stopcast
+			/delay 10
+		}
+
+		/while (!${Me.Song[Reflective Skin].ID}) {
+			/useitem "Mirrored Mask"
+			/delay 10
+			/rs Trying to use mask... 
+		}
+		
+		/if (${Me.Class.ShortName.Equal[BRD]}) /twist
+		/rs Mask click confirmed.
+	/return
+
+

@@ -34,7 +34,20 @@ SUB spellcombatMaintenance() {
 
 	/if (${killSpawn.ID}==NULL || ${killSpawn.Dead}==TRUE) {
 		/call spellcombatStop
-		/return
+		/RETURN
+	}
+
+	/if (${assistMustHaveName.NotEqual[FALSE]}) {
+		/if (${killSpawn.CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) {
+			/call spellcombatStop
+			/RETURN
+		}
+	}
+	/if (${assistMustNotHaveName.NotEqual[FALSE]}) {
+		/if (${killSpawn.CleanName.Upper.Find[${assistMustNotHaveName.Upper}]}!=NULL) {
+			/call spellcombatStop
+			/RETURN
+		}
 	}
 
 	/if (${spellKillID}!=0) {
@@ -264,4 +277,5 @@ SUB onCombatCastResult(string result, string opts) {
 
 	/RETURN
 }
+
 

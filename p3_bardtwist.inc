@@ -28,7 +28,15 @@ SUB bardtwistMaintenance {
 SUB bardtwistNewTwist(string cmd, string opts) {
 	/declare newOrder string local ${getStackCommandOpt[${opts},ORDER]}
 
-	/if (${Twist.Twisting}==TRUE) /twist ${newOrder}
+	/echo eff: ${Cast.Effect.ID} 
+	/if (${Cast.Effect.ID}!=NULL) {
+		/twist off
+		/delay 3
+		/echo new twist start: ${newOrder}
+		/twist ${newOrder}
+		/delay 5
+	}
+
 	/varset twistOrder ${newOrder}
 
 	/call writeBotIniOption Bard.TwistOrder "${newOrder}"

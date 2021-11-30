@@ -155,6 +155,7 @@ SUB movementStop (string cmd, string opts) {
 SUB movementKill(string cmd, string opts) {
 	/varset stickMode MELEE
 
+	/echo movement kill:
 	/if (${useMeleeCombat}==TRUE) {
 		/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
 		/call setActiveStickParams ${stickMode}

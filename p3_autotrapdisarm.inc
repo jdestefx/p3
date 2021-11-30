@@ -13,7 +13,7 @@ SUB p3_autotrapdisarm_init() {
 	/varset doAutoTrapDisarm ${getBotIniOption[Misc.AutoTrapDisarm,${doAutoTrapDisarm}]}
 
 
-	/invoke ${trapNames.Append[DESERT CURSE,A BLADE,FESTERING OOZE,JAGGED BLADES,A DARK ENTITY,A SHIMMERING ORB]}
+	/invoke ${trapNames.Append[DESERT CURSE,A BLADE,FESTERING OOZE,JAGGED BLADES,A DARK ENTITY,A SHIMMERING ORB,CAVE-IN]}
 	/invoke ${trapNames.Append[A FORMLESS TERROR,A LOW HUM,A SINGULARITY,A WARDSTONE,A NULL FIELD,AN IMMOBILIZER,TRAP]}
 	/invoke ${trapNames.Append[A PRESSURE PLATE,DECAYING REMAINS]}
 
@@ -42,12 +42,12 @@ SUB checkAutoDisarm() {
    /declare j int local 1
    /declare tName string local
    /declare xspawn spawn local
+   /declare nearbySpawnCount int local ${SpawnCount[radius 70]}
 
    /for i 0 to ${Math.Calc[${trapNames.Count}-1]}
       /varset tName ${trapNames.Item[${i}]}
 
-      /varset j 1
-      /while (1) {
+      /for j 1 to ${nearbySpawnCount}
          /if (${NearestSpawn[${j},radius 70].ID}==NULL) /break
          /vardata xspawn NearestSpawn[${j},radius 70]
 
@@ -58,9 +58,25 @@ SUB checkAutoDisarm() {
             /delay 3
             /RETURN
          }
+      /next j
 
-         /varset j ${Math.Calc[${j}+1]}
-      }
+
+		|/varset j 1
+		|/while (1) {
+		|   /if (${NearestSpawn[${j},radius 70].ID}==NULL) /break
+		|
+		|   /vardata xspawn NearestSpawn[${j},radius 70]
+		|
+		|   /if (${xspawn.CleanName.Find[${tName}]}!=NULL) {
+		|      /tar id ${xspawn.ID}
+		|      /delay 3
+		|      /doability "disarm traps"
+		|      /delay 3
+		|      /RETURN
+		|   }
+		|
+		|   /varset j ${Math.Calc[${j}+1]}
+		|}
 
    /next i
 
