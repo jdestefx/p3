@@ -15,6 +15,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [X] RETURN TO CAMP SPOT
       * [X] ADIST SETTINGS BY PERCENT
         [x] TANKING/AGGRO-ABILITIES
+        [X] BACKSTAB / BEHIND-ONLY SUPPORT
 
     HEALS
         [X] BASIC HEALING
@@ -31,13 +32,13 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
       * [X] BUFF OPTIONS INTO OWN INI SECTION
 
     COMBAT SPELLS
-        [ ] BASIC NUKING/DOTTING
-        [ ] CHARMING
-        [ ] AUTO-MEZ
-        [ ] AUTO-DEBUFFING
+        [x] BASIC NUKING/DOTTING
+        [x] CHARMING
+        [x] AUTO-MEZ
+        [x] AUTO-DEBUFFING MULTIPLE MOBS IN PROXMITY
 
     BARD TWIST
-      * [x] MACRO-CONTROLLED TWISTING
+      * [x] MACRO-CONTROLLED TWISTING (OPTIONAL)
 
     MISC
         [X] MEM IN GEM SUPPORT
@@ -46,27 +47,25 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [X] ALTERNATIVE INI SUPPORT
         [X] BASIC STICK/FOLLOW/STOP
         [X] TAGS (AKA PAST TAGS)
+        [X] STARTUP PAST TAGS ON COMMAND LINE
+        [X] STARTUP PAST TAGS IN INI
         [x] AUTO-TRAP DISARM (TRAP NAMES ARE HARD CODED)
-        [ ] AUTOMATIC DISPELLING
+        [X] AUTOMATIC DISPELLING
         [x] AD-HOC CAST ORDERS
         [X] AUTO EQBCS CHANNELS
       * [ ] COMMANDS TO CONTROL AUTO EQBCS CHANNELS
         [ ] TELL RELAY
         [x] ROAM/AUTO-FOLLOW (NAV)
-        [ ] MQ2FPS AUTO SETTINGS
+        [-] MQ2FPS AUTO SETTINGS (WILL NOT DO)
         [x] AUTO STAND FROM FEIGN (on/off)
         [x] EXPERIENCE REPORTS
         [X] AUTO-NETBOTS SETTINGS
-        [X] STARTUP PAST TAGS
         [X] STARTUP PLUGIN CHECKING
-
 
     TODO
         [ ] DIVINE ARB IS A SELF-TYPE THUS NOT CHECKING NETBOTS
         [ ] CHECK SPELL ENTRIES FOR COMBAT-ABILITIES AND WARN ACCORDINGLY
         [ ] INVESTIGATE PET HEALS BEING SPAMMED 
-        [ ] FIND A WAY TO DETECT FAILED INSTANT CLICK ITEMS (AON NOT STACKING WITH ILLUSION)
-
 
     CONSIDER/RECONSIDER
       * [ ] INTEGRATED CH ROT
