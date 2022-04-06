@@ -19,8 +19,6 @@ SUB p3_buffrequests_init {
 	/varset brReplyViaTell			${getBotIniOption[BuffRequestOptions.ReplyViaTell,${brReplyViaTell}]}
 	/varset brDoEmotes				${getBotIniOption[BuffRequestOptions.DoEmotes,${brDoEmotes}]}
 
-	/call validateSpellBasedArray iniBuffRequests
-
 	/if (${iniBuffRequests[1,1].Equal[-]}) /varset brEnabled FALSE
 
 	/RETURN
@@ -140,7 +138,7 @@ SUB onBuffRequestCastResult(string result, string opts) {
 	/declare buffName string local ${buffQueue.Item[${buffQueueIndex}].Token[2,_]}
 	/declare repeatMode bool local ${buffQueue.Item[${buffQueueIndex}].Token[4,_]}
 
-	/if (${result.Find[PASS_]}!=NULL || ${result.Find[FAIL_CAST_TAKEHOLD]}!=NULL) {
+	/if (${result.Find[PASS_]}!=NULL || ${result.Find[FAIL_NOHOLD]}!=NULL) {
 		/echo Buff request satisfied. Removing from queue.
 		/invoke ${buffQueue.Erase[${buffQueueIndex}]}		
 

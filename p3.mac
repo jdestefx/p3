@@ -1,3 +1,8 @@
+| todo:
+| add hott type for heals
+
+
+
 #include p3_events.inc
 #include p3_global.inc
 #include p3_movement.inc
@@ -21,13 +26,18 @@
 #include p3_exptrack.inc
 #include p3_autotrapdisarm.inc
 #include p3_tank.inc
+#include p3_autodebuff.inc
 #include p3_automez.inc
 #include p3_autodispell.inc
+#include p3_charm.inc
 #include p3_mine.inc
 
 #turbo 120
 
 SUB MAIN {
+	|/wire drawchaton
+	|/wire BGRenderRate 100
+
 	/echo p3 alpha: Starting...
 
 	/declare cq list outer
@@ -40,9 +50,10 @@ SUB MAIN {
 	/declare perfIdle int outer
 	/declare st int local
 	/declare et int local
+	/declare hardLoopReset bool outer FALSE
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,movement,automez,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
+	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,charm,movement,autodebuff,automez,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -58,7 +69,10 @@ SUB MAIN {
 		/if (!${MacroQuest.GameState.Equal[INGAME]}) /end
 		/if (!${Bool[${Me.Class}]}) /endmacro
 
+
 		/call checkCommandQueue
+		/if (${cq.Count}>0) /continue
+
 		/call checkMaintenance
 
 		/varset st ${MacroQuest.Running}
@@ -76,9 +90,15 @@ SUB checkMaintenance {
 	/declare et int local
 
 	/for i 0 to ${Math.Calc[ ${modules.Count}-1 ]}
-		/varset st ${MacroQuest.Running}
 		/doevents
+		/if (${hardLoopReset}==TRUE) {
+			/varset hardLoopReset FALSE
+			/break
+		}
+
+		/varset st ${MacroQuest.Running}
 		/call ${modules.Item[${i}]}Maintenance
+
 		/varset et ${MacroQuest.Running}
 		/varset p3_${modules.Item[${i}]}_perftime ${Math.Calc[${p3_${modules.Item[${i}]}_perftime} + (${et}-${st})]}
 
@@ -88,7 +108,6 @@ SUB checkMaintenance {
 
 	/RETURN
 }
-
 
 SUB checkCommandQueue {
 	/declare root string local
@@ -106,6 +125,7 @@ SUB checkCommandQueue {
 		/return
 	} else {
 		/for i 0 to ${Math.Calc[ ${commandStack${root}.Count}-1 ]}
+			|/echo /call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
 			/call ${commandStack${root}.Item[${i}].Token[2,:]} "${root}" "${cqHead}"
 			/if (${Macro.Return.Equal[RESET]}) {
 				/echo FALSE caught. Abanoning chain: ${commandStack${root}.Item[${i}].Token[2,:]}
@@ -126,6 +146,7 @@ SUB importCommandLine(string Param0, string Param1, string Param2, string Param3
 	/declare cmdPAST string outer 5
 
 	/declare opts list local
+	/invoke ${opts.Delimiter[|]}
 	/declare i int local
 
 	/declare k string local
@@ -169,7 +190,7 @@ SUB p3Setup {
 	/declare defaultSpellCombatClasses string outer CLR,DRU,NEC,WIZ,MAG,ENC,SHM
 	/declare manaClasses string outer CLR,DRU,ENC,PAL,BRD,WIZ,MAG,SHM,NEC,BST,SHD
 	/declare manaRegenClasses string outer CLR,DRU,ENC,PAL,WIZ,MAG,SHM,BST,SHD
-	/declare hasteClasses string outer MNK,BRD,ROG,WAR,RNG,PAL,BST,SHD,BER
+	/declare hasteClasses string outer MNK,ROG,WAR,RNG,BST,SHD,BER
 	/declare meleeClasses string outer BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR
 	/declare priestClasses string outer CLR,DRU,SHM
 	/declare hybridClasses string outer PAL,BST,BRD,RNG
@@ -330,7 +351,7 @@ SUB getSpellFromCastRequest(string castRequest) {
 
 SUB isLockoutExpired(string timerName) {
 	/if (${Defined[${timerName}]}==TRUE) {
-		/echo ${timerName} was defined. val:  ${${timerName}}
+		|/echo ${timerName} was defined. val:  ${${timerName}}
 		/if (${${timerName}}==0) {
 			/deletevar ${timerName}
 			/return TRUE
@@ -351,7 +372,6 @@ SUB lockout(string timerName, string dur) {
 			/varset ${timerName} ${dur}
 		}
 	} else {
-		/echo /declare ${timerName} timer outer ${dur}
 		/declare ${timerName} timer outer ${dur}
 	}
 
@@ -434,7 +454,6 @@ SUB getSpellDurationByRequestName(string castRequest) {
 	/RETURN ${s.MyDuration.TotalSeconds}
 }
 
-
 SUB MathDistanceXYZ(string x, string y, string z) {
 	/RETURN ${Math.Distance[${y} ${x} ${z}]}
 }
@@ -462,30 +481,3 @@ SUB clearStackActions(string action) {
 
 	/RETURN
 }
-
-#Event OMMMask "#*#You feel a gaze of deadly power focusing on you#*#"
-	Sub EVENT_OMMMask
-		/rs IT'S ME!!!!  (CH rot may miss a beat)
-
-		/if (${Me.Class.ShortName.Equal[BRD]}) {
-			/twist off
-			/delay 3
-		}
-		
-		/if (${Cast.Timing}>1) {
-			/interrupt
-			/stopcast
-			/delay 10
-		}
-
-		/while (!${Me.Song[Reflective Skin].ID}) {
-			/useitem "Mirrored Mask"
-			/delay 10
-			/rs Trying to use mask... 
-		}
-		
-		/if (${Me.Class.ShortName.Equal[BRD]}) /twist
-		/rs Mask click confirmed.
-	/return
-
-

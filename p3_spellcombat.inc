@@ -5,6 +5,8 @@ SUB p3_spellcombat_init {
 	/declare combatSpellsCheckTimer timer outer 0
 	/declare spellKillID int outer 0
 
+	|/call validateSpellBasedArray iniCombatSpells
+
 	/RETURN
 }
 
@@ -58,14 +60,12 @@ SUB spellcombatMaintenance() {
 }
 
 SUB checkCombatSpells {
-	/if (${movingTimer}>0) /return
 	/if (${combatSpellsCheckTimer}>0) /return
 	/if (${Me.Casting.ID}!=NULL) /return
 	
 	/varset combatSpellsCheckTimer 5
 
 	/declare i int local
-	/declare castResult string local
 	/declare cSpell spell local
 	/declare cSpellName string local
 	/declare maxResists int local 5
@@ -84,28 +84,29 @@ SUB checkCombatSpells {
 		/if (${cSpellName.Equal[-]}) /break
 
 		/if (${iniCombatSpells[${i},${bNotIfMounted}].NotEqual[-]}) {
-			/if (${Me.Mount.ID}!=NULL) /continue
+			/if (${Me.Mount.ID}!=NULL) /CONTINUE
 		}
+		
+		/if (${iniCombatSpells[${i},${bAutoDebuffOnly}].NotEqual[-]}) {
+			/continue
+		}
+
 
 		/if (${iniCombatSpells[${i},${bRequireCastIdle}].NotEqual[-]}) {
-			/if (${idleCastingTimer}>0) /continue
-		}
-
-		/if (${burnKey.NotEqual[-]}) {
-			/if (${iniCombatSpells[${i},${bBurnKey}].NotEqual[${burnKey}]}) /continue
+			/if (${idleCastingTimer}>0) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bNotIfAssistTag}].NotEqual[-]}) {
 			/if (${assistTags.Count}>0 || ${assistTags.Count}>0) {
 				/call validateAssistTags ${iniCombatSpells[${i},${bNotIfAssistTag}]} TRUE
-				/if (${Macro.Return}==TRUE) /continue
+				/if (${Macro.Return}==TRUE) /CONTINUE
 			}
 		}
 
 		/if (${iniCombatSpells[${i},${bRequireAssistTag}].NotEqual[-]}) {
-			/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /continue
+			/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /CONTINUE
 			/call validateAssistTags ${iniCombatSpells[${i},${bRequireAssistTag}]}
-			/if (${Macro.Return}==FALSE) /continue
+			/if (${Macro.Return}==FALSE) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bMaxResists}].NotEqual[-]}) {
@@ -113,81 +114,80 @@ SUB checkCombatSpells {
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfOverMana}].NotEqual[-]}) {
-			/if (${Me.PctMana} <= ${iniCombatSpells[${i},${bSelfOverMana}]}) /continue
+			/if (${Me.PctMana} <= ${iniCombatSpells[${i},${bSelfOverMana}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfUnderHP}].NotEqual[-]}) {
-			/if (${Me.PctHPs} >= ${iniCombatSpells[${i},${bSelfUnderHP}]}) /continue
+			/if (${Me.PctHPs} >= ${iniCombatSpells[${i},${bSelfUnderHP}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfOverHP}].NotEqual[-]}) {
-			/if (${Me.PctHPs} < ${iniCombatSpells[${i},${bSelfOverHP}]}) /continue
+			/if (${Me.PctHPs} < ${iniCombatSpells[${i},${bSelfOverHP}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfUnderMana}].NotEqual[-]}) {
-			/if (${Me.PctMana} >= ${iniCombatSpells[${i},${bSelfUnderMana}]}) /continue
+			/if (${Me.PctMana} >= ${iniCombatSpells[${i},${bSelfUnderMana}]}) /CONTINUE
 		}
 		/if (${iniCombatSpells[${i},${bSelfOverMana}].NotEqual[-]}) {
-			/if (${Me.PctMana} < ${iniCombatSpells[${i},${bSelfOverMana}]}) /continue
+			/if (${Me.PctMana} < ${iniCombatSpells[${i},${bSelfOverMana}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bSelfUnderEnd}].NotEqual[-]}) {
-			/if (${Me.PctEndurance} >= ${iniCombatSpells[${i},${bSelfUnderEnd}]} ) /continue
+			/if (${Me.PctEndurance} >= ${iniCombatSpells[${i},${bSelfUnderEnd}]} ) /CONTINUE
 		}
 		/if (${iniCombatSpells[${i},${bSelfOverEnd}].NotEqual[-]}) {
-			/if (${Me.PctEndurance} < ${iniCombatSpells[${i},${bSelfOverEnd}]} ) /continue
+			/if (${Me.PctEndurance} < ${iniCombatSpells[${i},${bSelfOverEnd}]} ) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetOverLevel}].NotEqual[-]}) {
-			/if (${Spawn[id ${spellKillID}].Level} < ${iniCombatSpells[${i},${bTargetOverLevel}]}) /continue
+			/if (${Spawn[id ${spellKillID}].Level} < ${iniCombatSpells[${i},${bTargetOverLevel}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetUnderLevel}].NotEqual[-]}) {
-			/if (${Spawn[id ${spellKillID}].Level} >= ${iniCombatSpells[${i},${bTargetUnderLevel}]}) /continue
+			/if (${Spawn[id ${spellKillID}].Level} >= ${iniCombatSpells[${i},${bTargetUnderLevel}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bRequireBodyType}].NotEqual[-]}) {
-			/if (${Select[${Spawn[id ${spellKillID}].Body.Name},${iniCombatSpells[${i},${bRequireBodyType}]}]}==0) /continue
+			/if (${Select[${Spawn[id ${spellKillID}].Body.Name},${iniCombatSpells[${i},${bRequireBodyType}]}]}==0) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetRace}].NotEqual[-]}) {
-			/if (${Select[${Spawn[id ${spellKillID}].Race},${iniCombatSpells[${i},${bTargetRace}]}]}==0) /continue
+			/if (${Select[${Spawn[id ${spellKillID}].Race},${iniCombatSpells[${i},${bTargetRace}]}]}==0) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bRequireMobsInProximity}].NotEqual[-]}) {
-			/if (${SpawnCount[npc loc ${Me.X} ${Me.Y} radius 25]} < ${iniCombatSpells[${i},${bRequireMobsInProximity}]}) /continue
+			/if (${SpawnCount[npc loc ${Me.X} ${Me.Y} radius 25]} < ${iniCombatSpells[${i},${bRequireMobsInProximity}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bRequireMaxMobsInProximity}].NotEqual[-]}) {
-			/if (${SpawnCount[npc loc ${Me.X} ${Me.Y} radius 45]} > ${iniCombatSpells[${i},${bRequireMaxMobsInProximity}]}) /continue
+			/if (${SpawnCount[npc loc ${Me.X} ${Me.Y} radius 45]} > ${iniCombatSpells[${i},${bRequireMaxMobsInProximity}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bRequireTargetClass}].NotEqual[-]}) {
-			/if (${Select[${Spawn[id ${spellKillID}].Class.ShortName},${iniCombatSpells[${i},${bRequireTargetClass}]}]}==0) /continue
+			/if (${Select[${Spawn[id ${spellKillID}].Class.ShortName},${iniCombatSpells[${i},${bRequireTargetClass}]}]}==0) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetOverHP}].NotEqual[-]}) {
-			/echo check TargetOverHP... 
 			/call fullTarget ${spellKillID}
-			/if (${Macro.Return}==FALSE) /continue
-			/if (${Target.PctHPs} < ${iniCombatSpells[${i},${bTargetOverHP}]}) /continue
+			/if (${Macro.Return}==FALSE) /CONTINUE
+			/if (${Target.PctHPs} < ${iniCombatSpells[${i},${bTargetOverHP}]}) /CONTINUE
 			/varset cancelConditions ${cancelConditions}TARGETUNDERHP:${iniCombatSpells[${i},${bTargetOverHP}]}|
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetUnderHP}].NotEqual[-]}) {
 			/call fullTarget ${spellKillID}
-			/if (${Macro.Return}==FALSE) /continue
-			/if (${Target.PctHPs} >= ${iniCombatSpells[${i},${bTargetUnderHP}]}) /continue
+			/if (${Macro.Return}==FALSE) /CONTINUE
+			/if (${Target.PctHPs} >= ${iniCombatSpells[${i},${bTargetUnderHP}]}) /CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetLifeManaRatio}].NotEqual[-]}) {
 			/call fullTarget ${spellKillID}
-			/if (${Macro.Return}==FALSE) /continue
+			/if (${Macro.Return}==FALSE) /CONTINUE
 
 			/varset lifeDeficit ${Math.Calc[100-${Target.PctHPs}]}
 			/varset lifeRatio ${iniCombatSpells[${i},${bTargetLifeManaRatio}]}
 			/if (${Me.PctMana} < ${Math.Calc[100-(${lifeDeficit}/${lifeRatio})]}) {
-				/continue
+				/CONTINUE
 			}
 		}
 
@@ -196,7 +196,7 @@ SUB checkCombatSpells {
 		}
 
 		/if (${isCastReady[${cSpellName}]}==FALSE) {
-			/continue
+			/CONTINUE
 		}
 
 		/if (${iniCombatSpells[${i},${bNoCancelChecks}].NotEqual[-]}) {
@@ -208,12 +208,14 @@ SUB checkCombatSpells {
 			/bc Warning: checkCombatSpells() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
 		} else {
 			/vardata cSpell ${Macro.Return}
-			/if (${isLockoutExpired[detriTimer_${cSpell.ID}]}==FALSE) /continue
-			/if (${isLockoutExpired[detriTimer_${spellKillID}_${cSpell.ID}]}==FALSE) /continue
+			/if (${isLockoutExpired[detriTimer_${cSpell.ID}]}==FALSE) /CONTINUE
+			/if (${isLockoutExpired[detriTimer_${spellKillID}_${cSpell.ID}]}==FALSE) /CONTINUE
+		
+			/if (${cSpell.MyCastTime}>0 && ${movingTimer}>0) /CONTINUE
 		}
 
 		/invoke (${cq.Append[CAST;SPELL=${cSpellName};TARGETID=${spellKillID};CANCELCONDITIONS=${cancelConditions};SRC=combatSpells;SRCIDX=${i};ONRESULT=onCombatCastResult]})
-		/break
+		/BREAK
 
 	/next i
 
@@ -221,60 +223,6 @@ SUB checkCombatSpells {
 }
 
 SUB onCombatCastResult(string result, string opts) {
-	/declare i int local ${getStackCommandOpt[${opts},SRCIDX]}
-	/declare cSpellName string local ${getStackCommandOpt[${opts},SPELL]}
-	/declare recastDelayTimerName string local
-	/declare targetDurationTimerName string local
-	/declare cSpell spell local
-	/declare targetID string local ${getStackCommandOpt[${opts},TARGETID]}
-
-	/call getSpellFromCastRequest "${cSpellName}"
-	/vardata cSpell ${Macro.Return}
-
-	/varset recastDelayTimerName detriTimer_${cSpell.ID}
-	/varset targetDurationTimerName detriTimer_${targetID}_${cSpell.ID}
-
-	/if (${result.Find[FAIL_CAST_TAKEHOLD]}!=NULL) {
-		/call lockout ${timerName} 120
-
-	} else /if (${result.Find[PASS_]}!=NULL) {
-
-		/if (${iniCombatSpells[${i},${bNoSitTimer}].NotEqual[-]}) {
-			/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
-		}
-
-		/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
-			/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
-		}
-
-		/if (${cSpell.Duration.TotalSeconds}>0) {
-			/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
-		}
-
-		|/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]} || ${cSpell.Duration.TotalSeconds} > 0) {
-		|}
-
-	} else /if (${result.Equal[FAIL_CAST_RESIST]}) {
-		|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}
-		|/bc Cast Attempts: ${currentResistCount} of ${maxResists}
-		|/if (${currentResistCount}<${maxResists}) {
-		|	/while (${isCastReady[${cSpellName}]}==FALSE) {
-		|		/delay 2
-		|	}
-		|	/goto :resistRetry
-		|}
-		|
-		|/if (${currentResistCount}==${maxResists}) {
-		|	/bc My spell was resisted too much.  Giving up...
-		|	/g Giving up casting ${cSpellName} on ${spellKillID}, too many resists.
-		|	/declare ${timerName} timer outer 5m
-		|}
-	} else /if (${result.Equal[FAIL_CAST_IMMUNE]}) {
-		/bc Immune.  Giving up...
-		/g Giving up casting ${cSpellName} on ${spellKillID}, target is immune.
-		/call lockout ${timerName} 5m
-	}
-
 	/RETURN
 }
 

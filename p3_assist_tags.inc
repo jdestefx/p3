@@ -2,10 +2,16 @@ SUB p3_assist_tags_init {
 	/declare assistTags list outer
 	/declare tempCombatTags list outer
 
+	/declare iniPastTags string outer -
+
+	/varset iniPastTags ${getBotIniOption[Misc.StartupAssistTags,${iniPastTags}]}
+
 	/if (${commandLine[${cmdPAST}].Length}>0) {
-		|/bc Adding PAST tags from startup: ${commandLine[${cmdPAST}].Replace[ ,]}
+		/bc Adding PAST tags from startup: ${commandLine[${cmdPAST}].Replace[ ,]}
 		/invoke ${assistTags.Append[${commandLine[${cmdPAST}].Replace[ ,]}]}
 	}
+
+	/if (${Bool[${iniPastTags}]}==TRUE) /call processIniPastTags
 
 	/RETURN
 }
@@ -33,7 +39,7 @@ SUB checkExpiringTags() {
 
 		/if (${Defined[past_${tName}]}==TRUE) {
 			/if (${past_${tName}}==0) {
-				/echo detected expired tag: ${tName} -- should remove
+				/bc detected expired tag: ${tName} -- should remove
 				/call wipeLockout past_${tName}
 				/call removePastTags ${tName}
 				/return
@@ -97,5 +103,24 @@ SUB removePastTags(string remTags) {
 
 	/invoke ${cq.Append[TAGSCHANGED;]}
 
+	/RETURN
+}
+
+SUB processIniPastTags() {
+	/declare i int local
+	/declare tok string local
+
+	|/declare importTags list local
+	|/invoke ${importTags.Append[${iniPastTags}]}
+
+	/for i 1 to ${Math.Calc[${iniPastTags.Count[,]}+1]}
+		/varset tok ${iniPastTags.Token[${i},,]}
+		/if (${assistTags.Contains[${tok.Lower}]}==FALSE) {
+			/invoke ${assistTags.Append[${tok}]}
+			/bc Adding ${tok} to assist tags from INI setting.
+		}
+	/next i
+
+	/invoke ${cq.Append[TAGSCHANGED;]}
 	/RETURN
 }

@@ -1,4 +1,5 @@
 SUB p3_movement_init {
+	/call p3RegisterCommand FOLLOW movementFollowDistCheck 01
 	/call p3RegisterCommand FOLLOW movementFollow 60
 	/call p3RegisterCommand STOP movementStop 60
 	/call p3RegisterCommand KILL movementKill 60
@@ -27,6 +28,7 @@ SUB p3_movement_init {
 	/declare followUseNavAssist bool outer 			TRUE
 	/declare fearReturnToStart bool outer 			TRUE
 	/declare feignAutoStand bool outer 				TRUE
+	/declare followMaxResponseDist int outer 		500
 
 	/varset followStickFlags ${getBotIniOption[Misc.FollowStickFlags,${followStickFlags}]}
 	/varset followStickDistance ${getBotIniOption[Misc.FollowStickDistance,${followStickDistance}]}
@@ -35,28 +37,32 @@ SUB p3_movement_init {
 	/varset followUseNavAssist ${getBotIniOption[Assist.FollowUseNavAssist,${followUseNavAssist}]}
 	/varset fearReturnToStart ${getBotIniOption[Misc.FearReturnToStart,${fearReturnToStart}]}
 	/varset feignAutoStand ${getBotIniOption[Misc.AutoStandFromFeign,${feignAutoStand}]}
+	/varset followMaxResponseDist ${getBotIniOption[Misc.FollowMaxResponseDist,${followMaxResponseDist}]}
 
 	/RETURN
 }
 
 
 SUB movementMaintenance() {
-	/if (${Me.Moving}==TRUE) /varset movingTimer 5
+	/if (${Me.Moving}==TRUE) /varset movingTimer 10
 
-	/if (${Me.Feared.ID}!=NULL) {
-		/if (${fearStartXYZ.NotEqual[-]}) /varset fearStartXYZ ${Me.X} ${Me.Y} ${Me.Z}
+	/if (${Me.Feared.ID}!=NULL && ${fearReturnToStart}==TRUE) {
+		/if (${fearStartXYZ.Equal[-]}) /varset fearStartXYZ ${Me.X} ${Me.Y} ${Me.Z}
 	} else {
 		/if (${fearStartXYZ.NotEqual[-]} && ${MathDistanceXYZ[${fearStartXYZ.Replace[ ,,]}]}>20) {
 			/nav locxyz ${fearStartXYZ}
 			/delay 10
-			/RETURN
+			/RETURN RESET
 		} else {
 			/varset fearStartXYZ -
 		}
 	}
 
 	/if (${Me.Feigning}==TRUE) {
-		/if (${feignAutoStand}==TRUE) /timed 5 /stand
+		/if (${feignAutoStand}==TRUE) {
+			/delay 10
+			/stand
+		}
 	}
 
 	/if (${stickTargetID}==0) {
@@ -99,7 +105,7 @@ SUB movementMaintenance() {
 
 	| BECAUSE STICK WILL FREAK OUT ALONG WALLS, RE-FACING THE MOB MAINTAINS PROPER MELEEING
 	/if (${refaceTimer}==0) {
-		/face id ${stickTargetID}
+		/squelch /face id ${stickTargetID}
 		/varset refaceTimer 20
 	}
 
@@ -110,11 +116,10 @@ SUB movementLockoutStick(string t) {
 	/if (${Stick.Active}==TRUE) {
 		/stick off
 		/moveto stop
-		/delay 5
+		/delay 12
 	}
 	
 	/varset stickLockoutTimer ${t}
-	/ECHO LOCKING OUT STICK FOR ${t}
 	/RETURN
 }
 
@@ -136,9 +141,24 @@ SUB movementRaiseAnchor(string cmd, string opts) {
 	/RETURN
 }
 
+SUB movementFollowDistCheck(string cmd, string opts) {
+	/declare tmpID int local ${getStackCommandOpt[${opts},SPAWNID]}
+
+	/echo ${Spawn[id ${tmpID}].Distance3D} 
+	/if (${Spawn[id ${tmpID}].Distance3D}>${followMaxResponseDist}) {
+		/RETURN RESET
+	}
+	
+	/RETURN
+}
+
 SUB movementFollow (string cmd, string opts) {
+	/echo distcheck1
+
 	/varset stickMode FOLLOW
+
 	/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
+
 	/call setActiveStickParams ${stickMode}
 
 	/RETURN

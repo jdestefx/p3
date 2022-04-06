@@ -22,6 +22,7 @@ SUB p3_autotrapdisarm_init() {
 
 
 SUB autotrapdisarmMaintenance() {
+	/if (${doAutoTrapDisarm}==FALSE) /RETURN
 	/if (${canDoAutoDisarm}==FALSE) /RETURN
 	/if (${checkAutoDisarmTimer}>0) /RETURN 
 

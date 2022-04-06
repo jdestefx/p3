@@ -13,7 +13,7 @@ SUB p3_roam_init() {
 
 
 SUB roamMaintenance() {
-	/call checkRoam
+	/if (${roamMode}==TRUE) /call checkRoam
 	/RETURN
 }
 

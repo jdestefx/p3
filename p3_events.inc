@@ -13,6 +13,7 @@ SUB EVENT_followMe(string line, string chatSender, string opts) {
 	/if (${Spawn[pc =${chatSender}].ID}==${Me.ID}) /return
 
 	/invoke ${cq.Append[FOLLOW;AUTHOR=${chatSender};SPAWNID=${Spawn[pc =${chatSender}].ID};STICKOPTS=${opts}]}
+	/varset hardLoopReset TRUE
 	/RETURN
 }
 
@@ -27,8 +28,12 @@ SUB EVENT_stop(string line, string chatSender) {
 #event kill "<#1#> p3 kill #2#"
 #event kill "[#1#(msg)] assist on #2#"
 #event kill "<#1#> assist on #2#"
+#event kill "[#1#(msg)] p3 assist on #2#"
+#event kill "<#1#> p3 assist on #2#"
 
 SUB event_kill(string line, string chatSender, string spawnID) {
+	/IF (${Spawn[id ${spawnID}].ID}==NULL) /bc Ignoring assist call for ${spawnID}
+
 	/if (${assistLock}==TRUE) /RETURN
 	/invoke ${cq.Append[KILL;AUTHOR=${chatSender};SPAWNID=${spawnID}]}
 	/RETURN
@@ -176,9 +181,8 @@ SUB EVENT_setAMTags(string line, string newTags)
 #event addPASTTags "[#*#(msg)] p3 pastadd #1#"
 #event addPASTTags "<#*#> p3 pastadd #1#"
 SUB EVENT_addPASTTags(string line, string newTags, string dur)
-	/echo here: ${newTags}|${dur}
 
-	/declare i int local 
+	/declare i int local
 	/declare tok string local
 
 	/for i 1 to ${Math.Calc[${newTags.Count[,]}+1]}
@@ -216,6 +220,7 @@ SUB event_setTwist(string line, string chatSender, string newOrder) {
 
 	/if (${newOrder.Upper.Equal[OFF]}) {
 		/twist off 
+		/timed 5 /twist off
 		/varset doTwist FALSE
 		/bc Twist is now off.
 		/return
@@ -361,35 +366,7 @@ SUB EVENT_adistChange(string line, string newDist)
 #EVENT adhocCast "[#1#(msg)] p3 cast #2#@#3#"
 #EVENT adhocCast "<#1#> p3 cast #2#@#3#"
 SUB EVENT_adhocCast(string line, string chatSender, string castName, string castTarget)
-	/varset castName ${castName.Upper}
-
-	/declare i int local
-	/declare botName string local
-	/declare botID int local
-	/declare spellID int local
-	/declare castSpell spell local
-
-	/if (${castTarget.Upper.Equal[ALL]}) {
-		/for i 1 to ${NetBots.Counts}
-			/varset botName ${NetBots.Client[${i}]}
-			/varset botID ${NetBots[${botName}].ID}
-			/if (${adhocCastList.Contains[${castName}_${botID}]}==TRUE) /continue
-			/invoke (${adhocCastList.Append[${castName}_${botID}]})
-		/next i
-	} else /if (${castTarget.Upper.Equal[SELF]}) {
-		/if (${adhocCastList.Contains[${castName}_${Me.ID}]}==TRUE) {
-			/bc Already have a cast request for ${castName} for ${Me.CleanName}
-			/return
-		}
-		/invoke ${adhocCastList.Append[${castName}_${Me.ID}]}
-	} else /if (${Spawn["${castTarget}"].ID}!=NULL) {
-		/if (${adhocCastList.Contains[${castName}_${Spawn["${castTarget}"].ID}]}==TRUE) {
-			/bc Already have a cast request for ${castName} for ${Spawn["${castTarget}"].CleanName}
-			/return
-		}
-		/invoke ${adhocCastList.Append[${castName}_${Spawn["${castTarget}"].ID}]}
-	}
-
+	/call addCastOrder "${castName.Upper}" "${castTarget}" FALSE
 /RETURN
 
 
@@ -447,8 +424,10 @@ SUB event_expSpammerResponder
 SUB event_buffsEnabled(string line, string who, string newMode)
 	/if (${newMode.Upper.Equal[ON]}) {
 		/varset buffsEnabled TRUE
+		/bc Buffs are now ON.
 	} else /if (${newMode.Upper.Equal[OFF]}) {
 		/varset buffsEnabled FALSE
+		/bc Buffs are now OFF.
 	}
 /RETURN
 
@@ -456,9 +435,9 @@ SUB event_buffsEnabled(string line, string who, string newMode)
 #event tauntSuccess "You capture #*# attention!"
 #event tauntSuccess "You capture #*# with your unparalleled reproach!"
 SUB EVENT_tauntSuccess(string line, string newMode)
-   /if (${Target.ID}==NULL) /return
-   
-   /invoke ${tauntSuccessList.Append[${Target.ID}_${MacroQuest.Running}]}
+	/if (${Target.ID}==NULL) /return
+	
+	/invoke ${tauntSuccessList.Append[${Target.ID}_${MacroQuest.Running}]}
 /RETURN
 
 
@@ -514,24 +493,105 @@ SUB event_toggleAutoMez(string line, string newMode)
 
 
 
+#EVENT toggleAutoAssist "#*#p3 autoassist #1#"
+#EVENT toggleAutoAssist "#*#p3 autoass #1#"
+#EVENT toggleAutoAssist "#*#p3 aa #1#"
+SUB event_toggleAutoAssist(string line, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset autoAssist TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset autoAssist FALSE
+	} else {
+		/bc Unknown autoAssist mode. Use ON or OFF.
+		/return
+	}
+
+	/bc AutoAssist is now: ${newMode}.
+	/em shrugs.
+/RETURN
+
+
+
 #EVENT mezBroke "#1# has been awakened by#*#"
 SUB EVENT_mezBroke(string line, string mobName)
-   /declare i int local
-   /declare mob spawn local
+	/declare i int local
+	/declare mob spawn local
 
-   /declare mobCount int local ${SpawnCount[=${mobName}]}
+	/declare mobCount int local ${SpawnCount[=${mobName}]}
 
-   | FIND THE CORRECT MOB. INITIATE A RE-MEZ BY REMOVING FROM MEZLIST AND LET MEZ CHECK FIND IT AGAIN
-   /for i 1 to ${mobCount}
-      /vardata mob NearestSpawn[${i},=${mobName}]
-      /if (${autoMezList.Index[${mob.ID}]}!=-1) {
-         /tar id ${mob.ID}
-         /delay 10
-         /if (${Target.Mezzed.ID}==NULL) {
-            /invoke ${autoMezList.Erase[${autoMezList.Index[${mob.ID}]}]}
+	| FIND THE CORRECT MOB. INITIATE A RE-MEZ BY REMOVING FROM MEZLIST AND LET MEZ CHECK FIND IT AGAIN
+	/for i 1 to ${mobCount}
+		/vardata mob NearestSpawn[${i},=${mobName}]
+		/if (${autoMezList.Index[${mob.ID}]}!=-1) {
+			/tar id ${mob.ID}
+			/delay 10
+			/if (${Target.Mezzed.ID}==NULL) {
+				/invoke ${autoMezList.Erase[${autoMezList.Index[${mob.ID}]}]}
 				/call wipeLockout mez_${mob.ID}
-            /return
-         }
-      }
-   /next i
+				/return
+			}
+		}
+	/next i
+/RETURN
+
+
+
+#event charmOn "[#*#(msg)] p3 charm #1#"
+SUB event_charmOn(string line, int spawnID)
+	/if (${Bool[${charmUseSpell}]}==FALSE) {
+		/bc I am not configured to accept charm commands.
+		/RETURN
+	}
+
+	/varset charmSpawnID ${spawnID}
+	/bc I will attempt to keep spawnID ${spawnID} ( ${Spawn[id ${charmSpawnID}]} ) charmed.
+/RETURN
+
+#event charmOff "[#*#(msg)] p3 charm off"
+#event charmOff "<#*#> p3 charm off"
+SUB event_charmOff(string line)
+	/if (${Bool[${charmUseSpell}]}==FALSE) /return
+	/if (${charmSpawnID}==0) /return
+
+	/bc I will no longer try to charm spawnID ${charmSpawnID}.
+
+	/varset charmSpawnID 0
+/RETURN
+
+#event useMelee "[#*#(msg)] p3 melee #1#"
+#event useMelee "<#*#> p3 melee #1#"
+SUB event_useMelee(string line, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset useMeleeCombat TRUE
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset useMeleeCombat FALSE
+	} else {
+		/bc Unknown useMeleeCombat mode. Use ON or OFF.
+		/return
+	}
+
+	/bc useMeleeCombat is now: ${newMode}.
+/RETURN
+
+
+#event castResist "#*# resisted your #*#!"
+SUB event_castResist(string line)
+	/varset castResult RESIST
+/RETURN
+
+#event castImmune "Your target is immune to #*#"
+SUB event_castImmune(string line)
+	/varset castResult IMMUNE
+/RETURN
+
+#event castNoTakeHold "Your #*# did not take hold#*#"
+SUB event_castNoTakeHold(string line)
+	/varset castResult NOHOLD
+/RETURN
+
+
+
+#event castInterrupted "Your #*# spell is interrupted."
+SUB event_castInterrupted(string line)
+	/varset castResult INTERRUPT
 /RETURN

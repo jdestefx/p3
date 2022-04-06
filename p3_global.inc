@@ -1,13 +1,15 @@
 SUB p3_global_init {
 	/declare autoKeywordIgnoreValues ON,OFF,YES,NO,NONE
-	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions
+	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions,AutoDebuffs
+	/declare iniSectionsAutoValidate string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions,AutoDebuffs
 	/declare debugMode bool outer FALSE
 	/declare botIniFile string outer -
 	/declare allNetbotNames string outer
 
 	/call processCommandLine
-	/call initializeIniTags
+	/call initializeEntryFlagSystem
 	/call loadIniSections
+	/call processAutoValidateIniSections
 	/call gatherNetbotNames
 
 	/declare bcsChannels string outer	${getDefaultBCSChannels[]}
@@ -35,8 +37,6 @@ SUB globalMaintenance() {
 	/RETURN
 }
 
-
-
 SUB loadIniSections {
 	/declare sections string local ${Ini[${botIniFile}]}
 	/declare a string local
@@ -59,7 +59,6 @@ SUB loadIniSections {
 		/call getIniSectionToArray "${botIniFile},${shortSectionName}" tmpArray
 		/call processArray tmpArray ${newArrayName}
 		/deletevar tmpArray
-
 	/next i
 
 	/for i 1 to ${Math.Calc[${iniSectionsAutoProcess.Count[,]}+1]}
@@ -71,9 +70,20 @@ SUB loadIniSections {
 	/RETURN
 }
 
-SUB initializeIniTags {
+SUB processAutoValidateIniSections() {
+	/declare i int local
+		
+	/for i 1 to ${Math.Calc[${iniSectionsAutoValidate.Count[,]}+1]}
+		/echo Validating: ini${iniSectionsAutoValidate.Token[${i},,]}
+		/call validateSpellBasedArray ini${iniSectionsAutoValidate.Token[${i},,]}
+	/next i
+
+	/RETURN
+}
+
+SUB initializeEntryFlagSystem {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bBurnKey,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -265,6 +275,11 @@ SUB characterPassesAllowKey(string charName, string allowKey) {
 	/if (${allowKey.Equal[ALL]}) /return TRUE
 	/if (${allowKey.Upper.Equal[@ALLNETBOTS]}) /return TRUE
 
+	/if (${allowKey.Upper.Equal[@SELF]}) {
+		/if (${xspawn.ID}==${Me.ID}) /RETURN TRUE
+		/RETURN FALSE
+	}
+
 	/if (${allowKey.Upper.Equal[@MANAREGENCLASSES]}) {
 		/if (${manaRegenClasses.Find[${xspawn.Class.ShortName}]}!=NULL) /return TRUE
 		/return FALSE
@@ -369,10 +384,10 @@ SUB validateTagsFromArray(string arrName) {
 
 		/if (${${arrName}[${i},${bNotIfAssistTag}].NotEqual[-]}) {
 			/if (${assistTags.Count}>0 || ${persistentAssistTags.Count}>0) {
-				/echo bNotIfAssistTag: ${${arrName}[${i},${bNotIfAssistTag}]} TRUE
+				|/echo bNotIfAssistTag: ${${arrName}[${i},${bNotIfAssistTag}]} TRUE
 				/call validateAssistTags ${${arrName}[${i},${bNotIfAssistTag}]} TRUE
 				/if (${Macro.Return}==TRUE) {
-					/echo invalidating: ${${arrName}[${i},1]}
+					|/echo invalidating: ${${arrName}[${i},1]}
 					/varset ${arrName}[${i},${bTagsInvalidated}] YES
 				} else {
 					/varset ${arrName}[${i},${bTagsInvalidated}] -
@@ -381,10 +396,10 @@ SUB validateTagsFromArray(string arrName) {
 		}
 		/if (${${arrName}[${i},${bRequireAssistTag}].NotEqual[-]}) {
 			/if (${assistTags.Count}==0 && ${persistentAssistTags.Count}==0) /continue
-			/ECHO bRequireAssistTag ${${arrName}[${i},${bRequireAssistTag}]}
+			|/ECHO bRequireAssistTag ${${arrName}[${i},${bRequireAssistTag}]}
 			/call validateAssistTags ${${arrName}[${i},${bRequireAssistTag}]}
 			/if (${Macro.Return}==FALSE) {
-				/echo invalidating: ${${arrName}[${i},1]}
+				|/echo invalidating: ${${arrName}[${i},1]}
 				/varset ${arrName}[${i},${bTagsInvalidated}] YES
 			} else {
 				/varset ${arrName}[${i},${bTagsInvalidated}] -
@@ -420,13 +435,18 @@ SUB isRealSpell(string request) {
 }
 
 SUB memorizeSpellInGem(string spellName, int gemNumber) {
+	/if (${Me.Book[${spellName}]}==NULL) {
+		/bc Cannot memorize ${spellName} - I don't have this spell.
+		/RETURN FALSE
+	}
+
 	/if (${Me.Casting.ID}!=NULL) {
 		/echo interrupt.
 		/interrupt
 		/delay 5
 	}
 
-	/memo "${spellName}" ${gemNumber}
+	/memspell ${gemNumber} "${spellName}"
 
 	/delay 3
 
@@ -437,7 +457,7 @@ SUB memorizeSpellInGem(string spellName, int gemNumber) {
 
 	/delay 35 ${Me.SpellReady[${spellName}]}
 
-	/RETURN
+	/RETURN TRUE
 }
 
 SUB isNetBotAttackingID(int targetID) {
@@ -496,8 +516,10 @@ SUB getDefaultBCSChannels() {
 
 SUB fullTarget(int targetID) {
 
-	/tar id ${targetID}
-	/delay 10
+	/if (${Target.ID} != ${targetID}) {
+		/tar id ${targetID}
+		/delay 10
+	}
 
 	/RETURN
 
@@ -521,3 +543,16 @@ SUB checkOpenWindows() {
 	/if (${Window[SpellBookWnd].Open})  /return TRUE
 	/return FALSE
 }
+
+SUB waitForInt(string eval, int result) {
+   :loopstart
+      /doevents
+      /delay 1
+      /if (${stopWait}) {
+         /varset stopWait FALSE
+         /return
+      }
+      /if (${${eval}}!=${result}) /goto :loopstart
+	/RETURN
+}
+

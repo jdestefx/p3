@@ -2,10 +2,16 @@ SUB p3_buffs_init {
 	/declare updateNetnoteTimer timer outer 0
 	/declare buffCheckTimer timer outer 30
 	/declare buffsEnabled bool outer true
+	/declare emptySpawn spawn outer
 
-	/call validateSpellBasedArray iniBuffs
 	/call processArrayTargets iniBuffs
 
+	/declare canDoExtendedStackCheck bool outer TRUE
+
+	/if (${Plugin[MQ2Dannet].Name.Length}==NULL) {
+		/varset canDoExtendedStackCheck FALSE
+	}
+	
 	/netnote
 
 	/RETURN
@@ -19,7 +25,7 @@ SUB buffsMaintenance() {
 	/if (${Me.Invis}==TRUE) /return
 	/if (${Stick.Active}==TRUE && ${combatStateTimer}==0) /return
 	/if (${Me.Casting.ID} !=0 && ${Twist.Twisting}==FALSE) /return
-	/if (${movingTimer}>0 && ${canCastWhileMoving}==FALSE) /return
+	|/if ((${Me.Moving} || ${movingTimer}>0) && ${canCastWhileMoving}==FALSE) /return
 
 	/call checkBuffs
 	/RETURN
@@ -37,6 +43,11 @@ SUB updateNetnoteBuffDurations {
 		/varset buffDurations ${buffDurations};${Me.Buff[${i}].Spell.ID}_${Me.Buff[${i}].Duration.TotalSeconds}
 	/next i
 
+	/for i 1 to 30
+		/if (${Me.Song[${i}].ID}==NULL) /continue
+		/varset buffDurations ${buffDurations};${Me.Song[${i}].Spell.ID}_${Me.Song[${i}].Duration.TotalSeconds}
+	/next i
+
 	/netnote ${buffDurations}
 
 	/RETURN
@@ -45,8 +56,6 @@ SUB updateNetnoteBuffDurations {
 SUB checkBuffs {
 	/if (${buffCheckTimer}>0) /return
 	/varset buffCheckTimer 15
-
-	|/echo buffecheck: combatTimer: ${combatStateTimer}
 
 	/declare i int local 
 	/declare targetNames list local 
@@ -68,14 +77,31 @@ SUB checkBuffs {
 
 	/for i 1 to ${iniBuffs.Size}
 		/invoke ${targetNames.Clear}
-
 		/if (${iniBuffs[${i},${bTargets}].Length}==0) /continue
 
 		/if (${iniBuffs[${i},1].Equal[-]}) /break
 		/if (${iniBuffs[${i},${bEnabled}].Equal[NO]}) /continue
 
+		/if (${Me.Moving} || ${movingTimer}>0 && ${iniBuffs[${i},${bCastableMoving}].Equal[-]}) {
+			/continue
+		}
+
 		/if (${combatStateTimer}>0) {
-			/if (${iniBuffs[${i},${bCastableDuringAssist}].Equal[-]}) /continue
+			/if (${iniBuffs[${i},${bCastableDuringAssist}].Equal[-]} && ${iniBuffs[${i},${bCastOnlyDuringAssist}].Equal[-]}) {
+				/if (${combatStateTimer}>0) /continue
+			}
+		}
+
+		/if (${iniBuffs[${i},${bGiftOfMana}].NotEqual[-]}) {
+			/if (${Me.Song[Gift Of Mana].ID}==NULL) /continue
+		}
+
+		/if (${iniBuffs[${i},${bCastableOnlyResting}].NotEqual[-]}) {
+			/if (${combatStateTimer}>0) /continue
+		}
+
+		/if (${iniBuffs[${i},${bCastOnlyDuringAssist}].NotEqual[-]}) {
+			/if (${combatStateTimer}==0) /continue
 		}
 
 		/if (${iniBuffs[${i},${bNotIfAssistTag}].NotEqual[-]}) {
@@ -115,12 +141,6 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},${bSelfUnderMana}].NotEqual[-]}) {
 			/if (${Me.PctMana} >= ${iniBuffs[${i},${bSelfUnderMana}]}) /continue
 		}
-		/if (${iniBuffs[${i},${bCastableOnlyResting}].NotEqual[-]}) {
-			/if (${combatStateTimer}>0) /continue
-		}
-		/if (${iniBuffs[${i},${bCastOnlyDuringAssist}].NotEqual[-]}) {
-			/if (${combatStateTimer}==0) /continue
-		}
 		/if (${iniBuffs[${i},${bSelfUnderEnd}].NotEqual[-]}) {
 			/if (${Me.PctEndurance} >= ${iniBuffs[${i},${bSelfUnderEnd}]} ) /continue
 		}
@@ -139,7 +159,8 @@ SUB checkBuffs {
 
 		/call getSpellFromCastRequest "${buffCastName}"
 		/if (${Macro.Return.Equal[UNKNOWN]}) {
-			/bc Warning: checkBuffs() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
+			/bc Warning: checkBuffs() getSpellFromCastRequest() returned UNKNOWN for ${iniBuffs[${i},${bName}]}. Not sure what to do. Disabling entry.
+			/varset iniBuffs[${i},${bEnabled}] NO
 			/RETURN
 		} else {
 			/vardata buffSpell ${Macro.Return}
@@ -188,7 +209,7 @@ SUB checkBuffs {
 			/if (${NetBots[${targetName}].State.Equal[DEAD]}) /continue
 
 			| HAVE THE BUFF?
-			/if (${Select[${buffSpellID},${NetBots[${targetName}].Buff}]}>0) {
+			/if (${Select[${buffSpellID},${NetBots[${targetName}].Buff}]}>0 || ${Select[${buffSpellID},${NetBots[${targetName}].ShortBuff}]}>0) {
 
 				| REBUFF SECONDS DONT MATER? REMOVE THIS PERSON FROM BUFF CANDIDATES
 				/if (${iniBuffs[${i},${bRebuffSeconds}].Equal[-]}) {
@@ -221,19 +242,18 @@ SUB checkBuffs {
 				| REMAINING TIME IS NOT SUFFICIENT, LEAVE THEM IN THE LIST BY DOING NOTHING
 			}
 
-			/if (${Select[${buffSpellID},${NetBots[${targetName}].ShortBuff}]}>0) {
-				/invoke ${targetNames.Remove[${targetName}]}
-				/continue
-			}
+			|/if (${Select[${buffSpellID},${NetBots[${targetName}].ShortBuff}]}>0) {
+			|	/invoke ${targetNames.Remove[${targetName}]}
+			|	/continue
+			|}
 
 			/if (${NetBots[${targetName}].InZone}==FALSE) { 
 				/invoke ${targetNames.Remove[${targetName}]}
 				/continue
 			}
 
-			/if (${iniBuffs[${i},${bExtendedStackCheck}].NotEqual[-]}) {
+			/if (${iniBuffs[${i},${bExtendedStackCheck}].NotEqual[-]} && ${canDoExtendedStackCheck}==TRUE) {
 				/dquery ${targetName} -q "Spell[${buffSpell}].Stacks" 
-				|/echo res: ${DanNet.Q}  ${buffSpell}
 				/if (${DanNet.Q}==FALSE) {
 					/invoke ${targetNames.Remove[${targetName}]}
 					/continue
@@ -241,7 +261,7 @@ SUB checkBuffs {
 			}
 
 			/if (${iniBuffs[${i},${bRequireGroupInRange}].NotEqual[-]}) {
-				/if (${targetName.NotEqual[${Me.CleanName}]} && ${Group.Member[${targetName}].ID}==NULL) {
+				/if (${targetName.NotEqual[${Me.CleanName}]} && ${Group.Member[${targetName}].Index}==NULL) {
 					/invoke ${targetNames.Remove[${targetName}]}
 					/continue
 				}
@@ -302,6 +322,7 @@ SUB checkBuffs {
 			}
 		/next j
 
+
 		/if (${targetNames.Count}==0) {
 			/if (${iniBuffs[${i},${bRevertToBandolier}].NotEqual[-]}) {
 				/if (${bandolierProfileIsActive[${iniBuffs[${i},${bRevertToBandolier}]}]}==FALSE) {
@@ -331,21 +352,30 @@ SUB checkBuffs {
 			/if (${Spawn[pc ${targetNames.Item[${teamIndex}]}].ID}==NULL) /continue
 			/vardata buffSpawn Spawn[pc ${targetNames.Item[${teamIndex}]}]
 		} else {
+
 			/if (${iniBuffs[${i},${bTargetType}].Upper.Equal[PET]}) {
 				/vardata buffSpawn Spawn[pcpet ${targetNames.Item[0]}]
 			} else {
-				/vardata buffSpawn Spawn[pc ${targetNames.Item[0]}]
+				/vardata buffSpawn emptySpawn
+				/for k 0 to ${Math.Calc[${targetNames.Count}-1]}
+					/vardata buffSpawn Spawn[pc ${targetNames.Item[${k}]}]
+					/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==TRUE) /break
+				/next k
 			}
 		}
-		
-		/if (${buffSpawn.ID}==NULL) /continue
 
-		/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==FALSE) /break
+
+		/if (${buffSpawn.ID}==NULL) /continue
+		/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==FALSE) /continue
 
 		/if (${iniBuffs[${i},${bNoCast}].NotEqual[-]}) /continue
 
 		/if (${iniBuffs[${i},${bMemInGem}].NotEqual[-]} && ${Me.Gem[${buffCastName}]}==NULL) {
 			/call memorizeSpellInGem "${buffCastName}" ${iniBuffs[${i},${bMemInGem}]}
+			/if (${Macro.Return}==FALSE) {
+				/varset iniBuffs[${i},${bEnabled}] NO
+				/continue
+			}
 		}
 
 		/if (${isCastReady[${buffCastName}]}==FALSE) {
@@ -358,6 +388,8 @@ SUB checkBuffs {
 		}
 
 		/invoke (${cq.Append[CAST;SPELL=${buffCastName};TARGETID=${buffSpawn.ID};BUFFSPELLID=${buffSpellID};CANCELCONDITIONS=${cancelConditions};SRC=iniBuffs;SRCIDX=${i};ONRESULT=onBuffCastResult]})
+
+		/varset buffCheckTimer 15
 		/break
 
 	/next i
@@ -381,14 +413,15 @@ SUB onBuffCastResult(string result, string opts) {
 		/call pauseAutoMed ${iniBuffs[${i},${bNoSitTimer}]}
 	}
 
-	/if (${result.Equal[FAIL_CAST_TAKEHOLD]}==TRUE) {
-		/call lockout noHoldTimer_${buffSpawn.ID}_${buffSpellID}
+	/if (${result.Equal[FAIL_NOHOLD]}==TRUE) {
+		/ECHO CALL lockout noHoldTimer_${targetID}_${buffSpellID}
+		/call lockout noHoldTimer_${targetID}_${buffSpellID} 5m
 	}
 
 	/if (${result.Equal.Equal[PASS_CAST_SUCCESS]}) {
 		/if (${NetBots[${Spawn[id ${targetID}].CleanName}].Level}!=NULL) {
 			/bc tell ${NetBots[${Spawn[id ${targetID}].CleanName} NETNOTE
-			/squelch /bct ${buffSpawn.CleanName} //netnote
+			/squelch /bct ${targetName} //netnote
 		}
 	}
 

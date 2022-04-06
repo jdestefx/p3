@@ -33,6 +33,14 @@ SUB checkAutoAbilities() {
 			/continue
 		}
 
+		/if (${iniAutoAbilities[${i},${bRequireBehindAssistTarget}].NotEqual[-]}) {
+			/if (${assistSpawnID}==0) /continue
+			/if (${Stick.Active}==FALSE) /continue
+			/echo distcheck: ${Spawn[id ${assistSpawnID}].MaxRangeTo} ${Spawn[id ${assistSpawnID}].Distance} ${Stick.Behind}
+			/if (${Spawn[id ${assistSpawnID}].Distance} > ${Spawn[id ${assistSpawnID}].MaxRangeTo}) /continue
+			/if (${Stick.Behind}==FALSE) /continue
+		}
+
 		/if (${iniAutoAbilities[${i},${bCastableOnlyResting}].NotEqual[-]}) {
 			/if (${assistSpawnID}!=0) /continue
 		}
@@ -46,7 +54,7 @@ SUB checkAutoAbilities() {
 		}
 
 		/if (${iniAutoAbilities[${i},${bRequireAssistTarget}].NotEqual[-]}) {
-			/if (${assistTarget}==0) /continue
+			/if (${assistSpawnID}==0) /continue
 		}
 
 		/if (${iniAutoAbilities[${i},${bFreeze}].NotEqual[-]}) {

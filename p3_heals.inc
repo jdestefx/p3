@@ -32,7 +32,6 @@ SUB p3_heals_init {
 	/invoke ${castTeamNetbotsList.Append[${castTeamNetbots.Upper}]}
 	/invoke ${castTeamNetbotsList.Remove[${Me.CleanName.Upper}]}
 
-	/call validateSpellBasedArray iniHeals
 	/call processArrayTargets iniHeals
 	/call validateTagsFromArray iniHeals
 
@@ -60,7 +59,7 @@ SUB healsMaintenance() {
 		/if (${Me.Casting.ID}!=NULL) /return
 		/if (${Me.Invis}==TRUE) /RETURN
 		/if (${Me.Silenced.ID}!=NULL) /RETURN
-		/if (${Me.Moving}==TRUE && ${canCastWhileMoving}==FALSE) /return
+		/if ((${Me.Moving}==TRUE || ${movingTimer} > 0) && ${canCastWhileMoving}==FALSE) /return
 
 		/call checkHeals
 
@@ -74,7 +73,6 @@ SUB healsMaintenance() {
 
 	/RETURN
 }
-
 
 SUB checkHeals {
 	/declare i int local
@@ -94,13 +92,14 @@ SUB checkHeals {
 	/declare healMask int local ${Math.Calc[${HT_NETBOT}|${HT_GROUP}]}
 	/declare getHealthTableIndex int local 1
 	/declare actionTaken bool local FALSE
+	/declare targetType string local -
 
 	/invoke ${botBuffIDs.Delimiter[ ]}
 
 	/call refreshHealTables
 
 	/for i 1 to ${iniHeals.Size}
-		/varset healMask 1
+		/varset healMask 3
 		/varset triggerIdleCasting TRUE
 		/varset cancelConditions
 		/varset getHealthTableIndex 0
@@ -118,17 +117,9 @@ SUB checkHeals {
 			/varset triggerIdleCasting FALSE
 		}
 
-		|/if (${iniHeals[${i},${bNotIfAssistTag}].NotEqual[-]}) {
-		|	/if (${assistTags.Count}>0 || ${persistentAssistTags.Count}>0) {
-		|		/call validateAssistTags ${iniHeals[${i},${bNotIfAssistTag}]} TRUE
-		|		/if (${Macro.Return}==TRUE) /continue
-		|	}
-		|}
-		|/if (${iniHeals[${i},${bRequireAssistTag}].NotEqual[-]}) {
-		|	/if (${assistTags.Count}==0 && ${persistentAssistTags.Count}==0) /continue
-		|	/call validateAssistTags ${iniHeals[${i},${bRequireAssistTag}]}
-		|	/if (${Macro.Return}==FALSE) /continue
-		|}
+		/if (${iniHeals[${i},${bGiftOfMana}].NotEqual[-]}) {
+			/if (${Me.Song[Gift Of Mana].ID}==NULL) /continue
+		}
 
 		/if (${iniHeals[${i},${bMyName}].NotEqual[-]}) {
 			/if (${Me.CleanName.Upper.NotEqual[${iniHeals[${i},${bMyName}].Upper}]}) /continue
@@ -184,7 +175,7 @@ SUB checkHeals {
 
 		/call getSpellFromCastRequest "${healSpellName}"
 		/if (${Macro.Return.Equal[UNKNOWN]}) {
-			/bc Warning: checkHeals() getSpellFromCastRequest() returned UNKNOWN. Not sure what to do.
+			/bc Warning: checkHeals() getSpellFromCastRequest() returned UNKNOWN for (${healSpellName}). Not sure what to do.
 			/RETURN
 		} else /if (${Macro.Return.Equal[ABILITY]}) {
 			/bc Warning: checkHeals() Abilities are not allowed as heal entries.
@@ -193,7 +184,13 @@ SUB checkHeals {
 			/vardata healSpell ${Macro.Return}
 		}
 
-		/if (${healSpell.TargetType.Equal[Self]}) {
+		/varset targetType ${healSpell.TargetType.Upper}
+
+		/if (${iniHeals[${i},${bForceTargetType}].NotEqual[-]}) {
+			/varset targetType ${iniHeals[${i},${bForceTargetType}].Upper}
+		}
+
+		/if (${targetType.Equal[SELF]}) {
 			/if (${Me.PctHPs}>${healPct}) /continue
 			/vardata healSpawn Spawn[id ${Me.ID}]
 		} else {
@@ -205,12 +202,14 @@ SUB checkHeals {
 			/if (${iniHeals[${i},${bOnlyNetBotPets}].NotEqual[-]}) /varset healMask ${HT_NETPET}
 			
 			/call getHealthTableEntry ${getHealthTableIndex} ${healMask} ${healPct} ${i}
+
 			/if (${Macro.Return.Equal[-]}) /continue
 
 			/echo healspawn: ${Macro.Return}
 			/if (${Macro.Return.Length}==0) {
 				/echo ${getHealthTableIndex} ${healMask} ${healPct} ${i}
 			}
+
 			/vardata healSpawn Spawn[=${Macro.Return}]
 		}
 
@@ -259,7 +258,6 @@ SUB checkHeals {
 
 	/RETURN FALSE
 }
-
 
 SUB refreshHealTables {
 	|/if (${refreshHealTableTimer}>0) /return
@@ -428,17 +426,17 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireDiseased}].NotEqual[-]}) {
-			/if (${mask}!=1) /continue
+			/if (${Math.Calc[${mask}&1]}==0) /continue
 			/if (${NetBots[${name}].Diseased} == 0) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequirePoisoned}].NotEqual[-]}) {
-			/if (${mask}!=1) /continue
+			/if (${Math.Calc[${mask}&1]}==0) /continue
 			/if (${NetBots[${name}].Poisoned} == 0) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireCursed}].NotEqual[-]}) {
-			/if (${mask}!=1) /continue
+			/if (${Math.Calc[${mask}&1]}==0) /continue
 			/if (${NetBots[${name}].Cursed} == 0) /continue
 		}
 
@@ -460,7 +458,9 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 		}
 
 		/varset matchCount ${Math.Calc[${matchCount}+1]}
-		/if (${matchCount}==${teamIndexOffset}) /return ${name}
+		/if (${matchCount}==${teamIndexOffset}) {
+			/return ${name}
+		}
 	/next i
 
 	/RETURN -

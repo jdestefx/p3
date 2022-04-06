@@ -23,7 +23,7 @@ SUB p3_assist_init {
 	/declare maxAssistDistance int outer 		500
 	/declare useAutoFire bool outer				FALSE
 	/declare autoAssistPercent int outer		99
-	/declare useEQCombatIndicator bool outer	TRUE
+	/declare useEQCombatIndicator bool outer	FALSE
 
 	/varset autoAssist 				${getBotIniOption[Assist.AutoAssist,${autoAssist}]}
 	/varset autoAssistPercent		${getBotIniOption[Assist.AutoAssistPercent,${autoAssistPercent}]}
@@ -163,7 +163,7 @@ SUB updateCombatStateTimer() {
 	/if (${combatStateCheckTimer}>0) /return
 	/varset combatStateCheckTimer 5
 
-	/if (${NetBots[${Me}].CombatState}==0) {
+	/if (${Me.CombatState.Equal[COMBAT]}) {
 		/varset combatStateTimer ${combatStateTimerMax}
 		/varset combatStateLongTimer ${combatStateLongTimerMax}		
 		/return

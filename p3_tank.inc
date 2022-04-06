@@ -97,8 +97,6 @@ SUB checkTankStatus() {
 		/echo SPELL=${iniTankActions[${i},1]}
 		/invoke (${cq.Append[CAST;SPELL=${iniTankActions[${i},1]};TARGETID=${assistSpawnID};]})
 
-		/if (${Macro.Return.Equal[CAST_SUCCESS]}) /return
-
 	/next i
 
 	/RETURN
