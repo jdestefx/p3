@@ -2,42 +2,39 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
 *** IF YOU WANT TO PLAY WITH AN ALPHA VERSION, GET P3A.MAC FROM http://hh.destef.com/download/p3/  --- YOU **must** CREATE A "p3_bots" SUBFOLDER IN YOUR MACROS FOLDER. ***
 
-
-:::P3 FEATURE STATUS:::
+    :::P3 FEATURE STATUS:::
 
     MELEE
         [X] BASIC STICKING/ATTACKING
-        [X] COMBAT ABILITIES (KICK, TIGER CLAW, MEND, BASH ETC) 
+        [X] COMBAT ABILITIES (KICK, TIGER CLAW, MEND, ETC) 
         [X] AUTO-ASSIST
-        [ ] BURNS
+        [X] BURNS
         [X] AUTO-OFFTANKING v2.0 (AKA SLAY)
         [ ] RANGED/BOW ATTACKING
         [X] AUTO-RETREAT
         [X] RETURN TO CAMP SPOT
-        [x] RETURN TO CAMP (USING A SPAWN AS CAMP LOCATION)
       * [X] ADIST SETTINGS BY PERCENT
         [x] TANKING/AGGRO-ABILITIES
 
     HEALS
         [X] BASIC HEALING
-        [X] CAST TEAMS (AKA HEAL-TEAM)
-        [ ] PANIC HEALING
+        [X] CAST TEAMS (AKA HEAL-TEAM/)
+        [-] PANIC HEALING  (WILL NOT DO)
         [X] XTARGET HEALS
         [X] PET HEALS (ANY NETBOT PET WILL BE CHECKED)
-        [x] AUTO-REZ (NEEDS MORE TESTING BUT WORKS)
+        [X] AUTO-REZ
 
     BUFFS
-        [X] BUFFS
+        [X] BASIC BUFFS
+        [X] CAST TEAM SUPPORT (AKA HEAL-TEAM FOR BUFFS)
         [X] BUFF REQUESTS
       * [X] BUFF OPTIONS INTO OWN INI SECTION
-        [x] BUFF RESPOND ONLY TO SAME GUILD
 
     COMBAT SPELLS
-        [x] SINGLE TARGET NUKING/DOTTING
-        [ ] MULTI TARGET NUKING/DOTTING
+        [ ] BASIC NUKING/DOTTING
         [ ] CHARMING
         [ ] AUTO-MEZ
-        [X] SINGLE TARGET AUTO-DEBUFFING
+        [ ] AUTO-DEBUFFING
 
     BARD TWIST
       * [x] MACRO-CONTROLLED TWISTING
@@ -58,7 +55,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
         [x] ROAM/AUTO-FOLLOW (NAV)
         [ ] MQ2FPS AUTO SETTINGS
         [x] AUTO STAND FROM FEIGN (on/off)
-        [x] EXPERIENCE REPORTS (SAY GAIN % ON KILL)
+        [x] EXPERIENCE REPORTS
         [X] AUTO-NETBOTS SETTINGS
         [X] STARTUP PAST TAGS
         [X] STARTUP PLUGIN CHECKING
@@ -66,6 +63,7 @@ P3 is a re-write of "e3lite" (look in my other repos) with a focus on speed, dur
 
     TODO
         [ ] DIVINE ARB IS A SELF-TYPE THUS NOT CHECKING NETBOTS
+        [ ] CHECK SPELL ENTRIES FOR COMBAT-ABILITIES AND WARN ACCORDINGLY
         [ ] INVESTIGATE PET HEALS BEING SPAMMED 
         [ ] FIND A WAY TO DETECT FAILED INSTANT CLICK ITEMS (AON NOT STACKING WITH ILLUSION)
 
