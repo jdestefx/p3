@@ -94,7 +94,7 @@ SUB checkAdhocCastList() {
 SUB onAdhocCastResult(string result, string opts) {
 	/declare removeIndex string local ${getStackCommandOpt[${opts},ADHOCINDEX]}
 	
-	/if (${result.NotEqual[FAIL_INTERRUPT]}) {
+	/if (${result.NotEqual[FAIL_INTERRUPT]} && ${result.NotEqual[FAIL_FIZZLE]}) {
 		/invoke ${adhocCastList.Erase[${removeIndex}]}
 	}
 

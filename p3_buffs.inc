@@ -171,7 +171,9 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},${bForceSpellID}].NotEqual[-]}) {
 			/varset buffSpellID ${iniBuffs[${i},${bForceSpellID}]}
 		}
-		
+
+		/if (${isLockoutExpired[bufflockout_${buffSpellID}]}==FALSE) /CONTINUE
+
 		/if (${iniBuffs[${i},${bIgnoreTargetType}].Equal[-]}) {
 			/if (${buffSpell.TargetType.Equal[Pet]} || ${iniBuffs[${i},${bTargetType}].Upper.Equal[PET]} ) {
 				/if (${Me.Pet.ID}==NULL) /continue
@@ -207,6 +209,9 @@ SUB checkBuffs {
 			}
 
 			/if (${NetBots[${targetName}].State.Equal[DEAD]}) /continue
+
+
+			|/echo ${targetName} ${iniBuffs[1,1]}
 
 			| HAVE THE BUFF?
 			/if (${Select[${buffSpellID},${NetBots[${targetName}].Buff}]}>0 || ${Select[${buffSpellID},${NetBots[${targetName}].ShortBuff}]}>0) {
@@ -266,7 +271,7 @@ SUB checkBuffs {
 					/continue
 				}
 
-				/if (${Spawn[pc ${targetName}].Distance} > ${buffSpellRange}) {
+				/if (${Spawn[pc ${targetName}].Distance3D} > ${buffSpellRange}) {
 					/invoke ${targetNames.Remove[${targetName}]}
 					/continue
 				}
@@ -316,7 +321,7 @@ SUB checkBuffs {
 				}
 			}
 
-			/if (${Spawn[pc ${targetName}].Distance} > ${buffSpellRange}) {
+			/if (${Spawn[pc ${targetName}].Distance3D} > ${buffSpellRange}) {
 				/invoke ${targetNames.Remove[${targetName}]}
 				/continue
 			}
@@ -340,8 +345,8 @@ SUB checkBuffs {
 
 		/if (${iniBuffs[${i},${bRequireGroupInRange}].NotEqual[-]}) {
 			/for k 1 to ${Group.Members}
-				/if (${Group.Member[${k}].ID}==NULL) /continue
-				/if (${Group.Member[${k}].Distance} > ${buffSpellRange}) /continue
+				/if (${Spawn[group =${Group.Member[${k}]}].ID}==NULL) /continue
+				/if (${Spawn[group =${k}].Distance3D} > ${buffSpellRange}) /continue
 			/next k
 		}
 
@@ -363,7 +368,6 @@ SUB checkBuffs {
 				/next k
 			}
 		}
-
 
 		/if (${buffSpawn.ID}==NULL) /continue
 		/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==FALSE) /continue
@@ -414,8 +418,13 @@ SUB onBuffCastResult(string result, string opts) {
 	}
 
 	/if (${result.Equal[FAIL_NOHOLD]}==TRUE) {
-		/ECHO CALL lockout noHoldTimer_${targetID}_${buffSpellID}
+		/echo Spell did not take hold. Locking out buff ${Spell[${buffSpellID}]} for 5m.
 		/call lockout noHoldTimer_${targetID}_${buffSpellID} 5m
+	}
+
+	/if (${iniBuffs[${i},${bRecastDelay}].NotEqual[-]}) {
+		/call lockout bufflockout_${buffSpellID} ${iniBuffs[${i},${bRecastDelay}]}
+		/echo Buff recast requested. Locking out buff ${Spell[${buffSpellID}]} for ${iniBuffs[${i},${bRecastDelay}]}.
 	}
 
 	/if (${result.Equal.Equal[PASS_CAST_SUCCESS]}) {

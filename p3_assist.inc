@@ -1,11 +1,12 @@
 SUB p3_assist_init {
 	/call p3RegisterCommand STOP assistStop 50
 	/call p3RegisterCommand FOLLOW assistFollow 50
-	/call p3RegisterCommand KILL assistKill 50
+	/call p3RegisterCommand KILL assistKill 40
 	/call p3RegisterCommand KILL assistKillNameCheck 1
 	/call p3RegisterCommand KILL assistKillLockCheck 5
 
 	/declare assistSpawnID int outer 0
+	/declare assistSpawnIDZone int outer 0
 	/declare combatStateCheckTimer timer outer 0
 	/declare combatStateTimer timer outer 0
 	/declare combatStateTimerMax int outer 50
@@ -39,7 +40,6 @@ SUB p3_assist_init {
 SUB assistKillNameCheck(string cmd, string opts) {
 	/declare checkSpawnID int local
 
-
 	/if (${assistMustHaveName.NotEqual[FALSE]}) {
 		/varset checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
 		/if (${Spawn[id ${checkSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) /RETURN RESET
@@ -59,10 +59,16 @@ SUB assistKillLockCheck(string cmd, string opts) {
 }
 
 SUB assistKill(string cmd, string opts) {
-	/varset assistSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
-	/varset assistTime 1200s
+	/declare checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
+	/declare sourceName string local ${getStackCommandOpt[${opts},AUTHOR]}
 
-	/if (${Spawn[id ${assistSpawnID}].Distance}>${maxAssistDistance}) /RETURN RESET
+	/if (${Spawn[=${sourceName}].ID}==NULL) /RETURN RESET
+	/if (${Spawn[id ${checkSpawnID}].ID}==NULL) /RETURN RESET
+	/if (${Spawn[id ${checkSpawnID}].Distance}>${maxAssistDistance}) /RETURN RESET
+
+	/varset assistSpawnID ${checkSpawnID}
+	/varset assistSpawnIDZone ${Zone.ID}
+	/varset assistTime 1200s
 
 	/declare lock string local
 	/varset lock ${getStackCommandOpt[${opts},LOCK]}
@@ -71,6 +77,8 @@ SUB assistKill(string cmd, string opts) {
 		/bc locking on ${assistSpawnID}
 		/varset assistLock TRUE
 	}
+
+	/if (${Me.Pet.ID}) /timed 3 /pet attack
 
 	/RETURN
 }
@@ -101,7 +109,15 @@ SUB assistMaintenance() {
 	/call updateCombatStateTimer
 
 	/if (${assistSpawnID}!=0) {
-		/if (${Spawn[id ${assistSpawnID}].ID}==NULL || ${Spawn[id ${assistSpawnID}].Dead}==TRUE) /call assistStop
+		/if (${assistSpawnIDZone}!=${Zone.ID}) {
+			/call assistStop
+			/RETURN
+		}
+
+		/if (${Spawn[id ${assistSpawnID}].ID}==NULL || ${Spawn[id ${assistSpawnID}].Dead}==TRUE) {
+			/call assistStop
+			/RETURN
+		}
 		
 		/if (${assistMustHaveName.NotEqual[FALSE]}) {
 			/if (${Spawn[id ${assistSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) {

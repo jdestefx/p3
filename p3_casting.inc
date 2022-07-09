@@ -55,24 +55,34 @@ SUB castingStop(string cmd, string opts) {
 SUB castingCast(string cmd, string opts) {
 	/call p3cast ${getStackCommandOpt[${opts},TARGETID]} "${getStackCommandOpt[${opts},SPELL]}" "${getStackCommandOpt[${opts},SRC]}" ${getStackCommandOpt[${opts},SRCIDX]}
 
+	/varset castingOpts ${opts}
+	/echo ret: ${Macro.Return}  ${opts}
+
 	/if (${Macro.Return.Equal[PASS_STARTED]}) {
-		/varset castingOpts ${opts}
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
+
 		/vardata untrackedCastSpell castingSpellEmpty
 		/varset castingTargetID ${getStackCommandOpt[${castingOpts},TARGETID]}
 		/invoke ${castingCancelConditions.Append[${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]}
-		/echo Cast Started [${castingSpell}].
+		/echo Cast Started: [${castingSpell}].
+
 	} else /if (${Macro.Return.Equal[PASS_INSTANT_CAST]}) {
-		/echo Instant cast [${getStackCommandOpt[${opts},SPELL]}] done.
-		/varset castingOpts ${opts}
+		/echo Instant cast done: [${getStackCommandOpt[${opts},SPELL]}]
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
 		/call castComplete ${castResult}
+
+	} else /if (${Macro.Return.Equal[PASS_ABILITY_DONE]}) {
+		/echo Ability Used: [${getStackCommandOpt[${opts},SPELL]}].
+
+	} else /if (${Macro.Return.Equal[FAIL_ABILITY_NOT_READY]}) {
+		/echo Ability Not Ready: [${getStackCommandOpt[${opts},SPELL]}].
+
 	} else /if (${Macro.Return.Find[FAIL_LOS]}!=NULL) {
 		/echo Couldn't cast. No line of sight.
-		/RETURN
+
 	} else /if (${Macro.Return.Find[FAIL_]}!=NULL) {
 		/echo Cast didn't start [${castingOpts}] => ${Macro.Return}
-		/call castComplete ${Macro.Return}
+
 	}
 
 	/RETURN
@@ -82,8 +92,10 @@ SUB castingMaintenance() {
 	/declare sourceArr string local
 	/declare i int local
 
-	/if (${Twist.Twisting}==TRUE && ${Me.Casting.ID}==${castingSpell.ID}) {
-		/if (${Cast.Timing}==0) /twist off
+	/if (${Twist.Twisting}==TRUE && ${Me.Casting.ID}==${castingSpell.ID} && ${castingSpell.ID}!=0) {
+		/if (${Cast.Timing}==0) {
+			/twist off
+		}
 		/RETURN RESET
 	}
 
@@ -103,15 +115,18 @@ SUB castingMaintenance() {
 			/if (${castResult.Equal[IDLE]}) /varset castResult STARTED
 			/call castingSetIdle
 		} else {
-			|/echo Casting ${castingSpell} as expected...
+			|/echo Casting ${castingSpell} as expected... CC: ${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}
 			/varset buffCheckTimer 10
-			/if (${castingTargetID}==${Target.ID}) /call checkCancelConditions
+			/if (${castingTargetID}==${Target.ID}) {
+				/call checkCancelConditions
 
-			/if (${Macro.Return}==TRUE) {
-				/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
-				/interrupt
-				/delay 3
-				/RETURN RESET
+				/if (${Macro.Return}==TRUE) {
+					/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
+					/interrupt
+					/delay 3
+					/call castingSetIdle
+					/RETURN RESET
+				}
 			}
 		}
 
@@ -125,6 +140,13 @@ SUB castingMaintenance() {
 			/varset sourceArr ${getStackCommandOpt[${castingOpts},SRC]}
 			/varset i ${getStackCommandOpt[${castingOpts},SRCIDX]}
 
+			/if (${castResult.Equal[-]}) {
+				| DIDN'T CATCH A CAST RESULT - NOTHING TO DO
+				/BC Woops - Didn't catch a cast result.
+				/em is confused.
+				/RETURN
+			}
+
 			/if (${castResult.Equal[STARTED]}) /varset castResult SUCCESS
 
 			/if (${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
@@ -134,7 +156,6 @@ SUB castingMaintenance() {
 				| PROCESS CHAT EVENTS TO MAKE SURE RESISTS AND SUCH GET REGISTERED
 				/doevents
 				/delay 5
-				/echo Result => ${castResult}
 			}
 			
 			/if (${${sourceArr}[${i},${bNoSitTimer}].NotEqual[-]}) {
@@ -148,7 +169,8 @@ SUB castingMaintenance() {
 				/call castComplete FAIL_${castResult}
 			}
 
-			/call castingSetIdle
+			/varset castResult -
+
 			/RETURN
 		}
 
@@ -172,7 +194,6 @@ SUB checkCancelConditions() {
 		/if (${e.Find[TARGETDEAD]}!=NULL) {
 			/if (${Target.Dead}==TRUE) /return TRUE
 		}
-
 
 		/if (${e.Find[TARGETISASSITTARGET]}!=NULL) {
 			/if (${assistSpawnID}==${Target.ID}) /return TRUE
@@ -209,11 +230,12 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/declare castSpell spell local
 	/declare bardWasTwisting bool local FALSE
 	/declare ret string local
-	/declare hasCastTime bool local true
+	/declare hasCastTime bool local TRUE
 
 	/call getCastTypeByCastRequest "${castName}"
 	/if (${Macro.Return.Equal[UNKNOWN]}) /RETURN FAIL_UNKNOWN_SPELL
 	/varset castType ${Macro.Return}
+
 
 	| CHECK ABILITIES AND HANDLE RIGHT AWAY SINCE THEY DONT HAVE "SPELLS" 
 	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
@@ -222,18 +244,33 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/call getSpellFromCastRequest "${castName}"
 
 	/if (${Macro.Return.Equal[UNKNOWN]}) {
-		| UNKNOWN is probably a combat ability like taunt, can allow.
+		/vardata castSpell castingSpellEmpty
+
 	} else /if (${Macro.Return.NotEqual[ABILITY]}) {
 		/vardata castSpell ${Macro.Return}
 		/if (${Spawn[id ${targetID}].LineOfSight}==FALSE && ${castSpell.SpellType.Find[Detri]}) /RETURN FAIL_LOS
 	}
 
-	/if (${isCastReady[${castName}]}==FALSE) /RETURN FAIL_CAST_NOT_READY
+	/if (${isCastReady[${castName}]}==FALSE) {
+		/if (${castType.Equal[ABILITY]}) {
+			/RETURN FAIL_ABILITY_NOT_READY
+		}
+
+		/vardata castSpell castingSpellEmpty
+		/RETURN FAIL_CAST_NOT_READY
+	}
 
 	/if (${castType.Equal[ALTABILITY]} && ${AltAbility[${castName}].Spell.CastTime}==0) /varset hasCastTime FALSE
 	/if (${castType.Equal[ITEM]} && ${FindItem[=${castName}].CastTime}==0) /varset hasCastTime FALSE
 	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
-	/if (${castType.Equal[DISCIPLINE]}) /varset hasCastTime FALSE
+	/if (${castType.Equal[DISCIPLINE]}) {
+		/if (${Spell[${castName}].MyCastTime} != NULL && ${Spell[${castName}].MyCastTime}>0) {
+			/echo has cast time: ${Spell[${castName}]}
+			/varset hasCastTime TRUE
+		} else {
+			/varset hasCastTime FALSE
+		}
+	}
 
 	/echo Casting/Doing [${castName}] => ${Spawn[id ${targetID}].CleanName}
 
@@ -252,27 +289,27 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 
 	/if (${castType.Equal[ABILITY]}) {
 		/doability ${Me.Ability[${castName}]}
-		/RETURN PASS_INSTANT_CAST
-	
+		/RETURN PASS_ABILITY_DONE	
+
 	} else /if (${castType.Equal[DISCIPLINE]}) {
 		/disc ${castName}
-		/RETURN PASS_INSTANT_CAST
 
+		/if (${hasCastTime}==TRUE) /RETURN PASS_STARTED
+		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
 	} else /if (${castType.Equal[ALTABILITY]}) {
 		/alt act ${AltAbility[${castName}].ID}
 		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
-
 	} else /if (${castType.Equal[ITEM]}) {
-		/useitem "${castName}"
-		|/itemnotify "${castName}" rightmouseup
+		|/useitem "${castName}"
+		/itemnotify "${castName}" rightmouseup
+		/delay 5
 		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
-
 	} else /if (${castType.Equal[SPELL]}) {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
 			|/CAST ${Me.Gem[${castName}]}
 			/twist once ${Me.Gem[${castName}]}
 		} else {
-			/cast "${castName}"
+			/cast ${Me.Gem[${castName}]}
 		}
 	}
 
@@ -284,7 +321,6 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 }
 
 SUB castComplete(string result) {
-
 	/varset buffCheckTimer 10
 	/declare funcName string local
 	/declare i int local ${getStackCommandOpt[${castingOpts},SRCIDX]}
@@ -303,53 +339,51 @@ SUB castComplete(string result) {
 	/varset recastDelayTimerName detriTimer_${cSpell.ID}
 	/varset targetDurationTimerName detriTimer_${targetID}_${cSpell.ID}
 
-	|/if (${trackRecast.Equal[1]}) {
-		/if (${result.Find[FAIL_NOHOLD]}!=NULL) {
-			/call lockout ${recastDelayTimerName} 120
+	/if (${result.Find[FAIL_NOHOLD]}!=NULL) {
+		/call lockout ${recastDelayTimerName} 120
 
-		} else /if (${result.Find[PASS_]}!=NULL) {
-			/if (${iniCombatSpells[${i},${bNoSitTimer}].NotEqual[-]}) {
-				/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
-			}
-
-			/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
-				/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
-			}
-
-			/if (${cSpell.Duration.TotalSeconds}>0) {
-				/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
-			}
-
-			|/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]} || ${cSpell.Duration.TotalSeconds} > 0) {
-			|}
-
-		} else /if (${result.Equal[FAIL_RESIST]}) {
-			|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}
-			|/bc Cast Attempts: ${currentResistCount} of ${maxResists}
-			|/if (${currentResistCount}<${maxResists}) {
-			|	/while (${isCastReady[${cSpellName}]}==FALSE) {
-			|		/delay 2
-			|	}
-			|	/goto :resistRetry
-			|}
-			|
-			|/if (${currentResistCount}==${maxResists}) {
-			|	/bc My spell was resisted too much.  Giving up...
-			|	/g Giving up casting ${cSpellName} on ${spellKillID}, too many resists.
-			|	/declare ${recastDelayTimerName} timer outer 5m
-			|}
-		} else /if (${result.Equal[FAIL_IMMUNE]}) {
-			/bc Immune.  Giving up...
-			/g Giving up casting ${cSpellName} on ${spellKillID}, target is immune.
-			/call lockout ${recastDelayTimerName} 5m
+	} else /if (${result.Find[PASS_]}!=NULL) {
+		/if (${iniCombatSpells[${i},${bNoSitTimer}].NotEqual[-]}) {
+			/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
 		}
-	|}
+
+		/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
+			/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
+		}
+
+		/if (${cSpell.Duration.TotalSeconds}>0) {
+			/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
+		}
+
+	} else /if (${result.Equal[FAIL_RESIST]}) {
+		|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}
+		|/bc Cast Attempts: ${currentResistCount} of ${maxResists}
+		|/if (${currentResistCount}<${maxResists}) {
+		|	/while (${isCastReady[${cSpellName}]}==FALSE) {
+		|		/delay 2
+		|	}
+		|	/goto :resistRetry
+		|}
+		|
+		|/if (${currentResistCount}==${maxResists}) {
+		|	/bc My spell was resisted too much.  Giving up...
+		|	/g Giving up casting ${cSpellName} on ${spellKillID}, too many resists.
+		|	/declare ${recastDelayTimerName} timer outer 5m
+		|}
+	} else /if (${result.Equal[FAIL_IMMUNE]}) {
+		/bc Immune.  Giving up...
+		/g Giving up casting ${cSpellName} on ${spellKillID}, target is immune.
+		/call lockout ${recastDelayTimerName} 5m
+	}
 
 	/varset funcName ${getStackCommandOpt[${castingOpts},ONRESULT]}
 
-	/if (${funcName.Equal[-]}) /RETURN
-
-	/call ${funcName} ${result} "${castingOpts}"
+	/if (${funcName.Equal[-]}) {
+		/call castingSetIdle
+	} else {
+		/call ${funcName} ${result} "${castingOpts}"
+		/call castingSetIdle
+	}
 
 	/RETURN
 }

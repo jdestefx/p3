@@ -20,6 +20,7 @@ SUB p3_movement_init {
 	/declare activeStickDistance string outer
 	/declare movingTimer timer outer 0
 	/declare fearStartXYZ string outer -
+	/declare stickStartZone int outer 0
 
 	/declare followStickFlags string outer 			UW
 	/declare followStickDistance string outer 		10
@@ -39,12 +40,15 @@ SUB p3_movement_init {
 	/varset feignAutoStand ${getBotIniOption[Misc.AutoStandFromFeign,${feignAutoStand}]}
 	/varset followMaxResponseDist ${getBotIniOption[Misc.FollowMaxResponseDist,${followMaxResponseDist}]}
 
+	/if (${meleeStickFlags.Equal[FALSE]}) /varset meleeStickFlags
+
 	/RETURN
 }
 
 
 SUB movementMaintenance() {
 	/if (${Me.Moving}==TRUE) /varset movingTimer 10
+	/if (${Me.Ducking}==TRUE) /stand
 
 	/if (${Me.Feared.ID}!=NULL && ${fearReturnToStart}==TRUE) {
 		/if (${fearStartXYZ.Equal[-]}) /varset fearStartXYZ ${Me.X} ${Me.Y} ${Me.Z}
@@ -78,6 +82,11 @@ SUB movementMaintenance() {
 		/RETURN
 	}
 
+	/if (${stickStartZone} != 0 && ${Zone.ID}!=${stickStartZone}) {
+		/call movementStop
+		/return
+	}
+
 	/if (${Spawn[id ${stickTargetID}].ID}==NULL || ${Spawn[id ${stickTargetID}].Dead}==TRUE) {
 		/if (${Nav.Active}) /nav stop
 		/if (${Stick.Active}) /stick off
@@ -97,16 +106,18 @@ SUB movementMaintenance() {
 
 	/if (${Stick.StickTarget}!=${stickTargetID} || ${Stick.Active}==FALSE || ${needRestick}==TRUE || ${Me.FeetWet}==TRUE && ${feetWetStickTimer}==0) {
 		/if (${Nav.Active}==TRUE) /nav stop
-		|/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags} 
+		|/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
 		/stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
+		/if (${Me.Sitting}==TRUE) /stand
 		/varset needRestick FALSE
 		/if (${Me.FeetWet}==TRUE) /varset feetWetStickTimer 40
 	}
 
+
 	| BECAUSE STICK WILL FREAK OUT ALONG WALLS, RE-FACING THE MOB MAINTAINS PROPER MELEEING
 	/if (${refaceTimer}==0) {
-		/squelch /face id ${stickTargetID}
-		/varset refaceTimer 20
+		/squelch /face fast id ${stickTargetID}
+		/varset refaceTimer 5
 	}
 
 	/RETURN
@@ -124,7 +135,6 @@ SUB movementLockoutStick(string t) {
 }
 
 SUB movementRoamMoveStart(string cmd, string opts) {
-	/echo lockout stick!
 	/varset stickRoamLockoutTimer 30
 
 	/RETURN
@@ -144,7 +154,6 @@ SUB movementRaiseAnchor(string cmd, string opts) {
 SUB movementFollowDistCheck(string cmd, string opts) {
 	/declare tmpID int local ${getStackCommandOpt[${opts},SPAWNID]}
 
-	/echo ${Spawn[id ${tmpID}].Distance3D} 
 	/if (${Spawn[id ${tmpID}].Distance3D}>${followMaxResponseDist}) {
 		/RETURN RESET
 	}
@@ -153,20 +162,22 @@ SUB movementFollowDistCheck(string cmd, string opts) {
 }
 
 SUB movementFollow (string cmd, string opts) {
-	/echo distcheck1
 
 	/varset stickMode FOLLOW
 
 	/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
+	/varset stickStartZone ${Zone.ID}
 
 	/call setActiveStickParams ${stickMode}
 
 	/RETURN
 }
 
-SUB movementStop (string cmd, string opts) {
+SUB movementStop(string cmd, string opts) {
 	/varset stickTargetID 0
+	/varset stickStartZone 0
 	/moveto stop
+	/stick off
 	/if (${Nav.Active}==TRUE) /nav stop
 
 	/RETURN
@@ -175,7 +186,6 @@ SUB movementStop (string cmd, string opts) {
 SUB movementKill(string cmd, string opts) {
 	/varset stickMode MELEE
 
-	/echo movement kill:
 	/if (${useMeleeCombat}==TRUE) {
 		/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
 		/call setActiveStickParams ${stickMode}

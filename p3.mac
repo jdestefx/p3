@@ -31,6 +31,7 @@
 #include p3_autodispell.inc
 #include p3_charm.inc
 #include p3_mine.inc
+#include p3_eqemu.inc
 
 #turbo 120
 
@@ -38,7 +39,7 @@ SUB MAIN {
 	|/wire drawchaton
 	|/wire BGRenderRate 100
 
-	/echo p3 alpha: Starting...
+	/echo p3 alpha [0.10k]: Starting...
 
 	/declare cq list outer
 	/declare cqHead string outer
@@ -51,9 +52,11 @@ SUB MAIN {
 	/declare st int local
 	/declare et int local
 	/declare hardLoopReset bool outer FALSE
+	/declare lastZonedMark int outer 0
+	/declare recentlyZoned bool outer FALSE
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,charm,movement,autodebuff,automez,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
+	/invoke ${modules.Append[global,eqemu,assist_tags,targetting,casting,castorders,charm,movement,automez,autodebuff,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -70,6 +73,7 @@ SUB MAIN {
 		/if (!${Bool[${Me.Class}]}) /endmacro
 
 
+		/call checkZoning
 		/call checkCommandQueue
 		/if (${cq.Count}>0) /continue
 
@@ -82,6 +86,16 @@ SUB MAIN {
 	}
 
 	/END
+}
+
+SUB checkZoning {
+	/if (${Me.LastZoned}!=${lastZonedMark}) {
+		/varset lastZonedMark ${Me.LastZoned}
+		/varset recentlyZoned TRUE
+		/timed 80 /varset recentlyZoned FALSE
+	}
+
+	/RETURN
 }
 
 SUB checkMaintenance {
@@ -97,6 +111,7 @@ SUB checkMaintenance {
 		}
 
 		/varset st ${MacroQuest.Running}
+		|/echo ${modules.Item[${i}]}Maintenance
 		/call ${modules.Item[${i}]}Maintenance
 
 		/varset et ${MacroQuest.Running}
@@ -186,6 +201,8 @@ SUB importCommandLine(string Param0, string Param1, string Param2, string Param3
 }
 
 SUB p3Setup {
+	/declare generalIniFile string outer p3_bots\general.ini
+
 	/declare defaultMeleeCombatClasses string outer BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR
 	/declare defaultSpellCombatClasses string outer CLR,DRU,NEC,WIZ,MAG,ENC,SHM
 	/declare manaClasses string outer CLR,DRU,ENC,PAL,BRD,WIZ,MAG,SHM,NEC,BST,SHD
@@ -208,6 +225,8 @@ SUB p3Setup {
 	/declare cfSticking int outer 4
 	/declare cfCasting int outer 8
 	/declare cfInvis int outer 16
+
+	/squelch /moveto set dist 10
 
 	/RETURN
 }
@@ -293,7 +312,6 @@ SUB p3RegisterCommand(string cmd, string funcName, string order) {
 }
 
 SUB getStackCommandOpt (string opts, string k) {
-
 	/declare sp int local ${opts.Find[;${k}=]}
 	/declare ret string local -
 
@@ -304,17 +322,23 @@ SUB getStackCommandOpt (string opts, string k) {
 	/RETURN ${ret}
 }
 
-SUB getBotIniOption(string opt, string defaultResponse) {
+SUB getBotIniOption(string opt, string defaultResponse, string iniSource) {
+	/if (${iniSource.Length}==0) /varset iniSource bot
+
 	/declare iniKey string local 
 	/declare iniValue string local
+	/declare useSource string local
+	/if (${iniSource.Equal[general]}) /varset useSource ${generalIniFile}
+	/if (${iniSource.Equal[bot]}) /varset useSource ${botIniFile}
 
-	/varset iniKey ${botIniFile},${opt.Token[1,.]},${opt.Token[2,.]}
+
+	/varset iniKey ${useSource},${opt.Token[1,.]},${opt.Token[2,.]}
 	/varset iniValue ${Ini[${iniKey}]}
 
 	/if (${iniValue.Equal[NULL]}) {
 		/if (${defaultResponse.Equal[FALSE]}) /varset defaultResponse NO
 		/if (${defaultResponse.Equal[TRUE]}) /varset defaultResponse YES
-		/call writeBotIniOption "${opt}" "${defaultResponse}"
+		/call writeBotIniOption "${opt}" "${defaultResponse}" ${iniSource}
 		/RETURN ${defaultResponse}
 	} else {
 		/if (${iniValue.Upper.Equal[ON]} || ${iniValue.Upper.Equal[YES]} || ${iniValue.Upper.Equal[TRUE]}) {
@@ -329,8 +353,14 @@ SUB getBotIniOption(string opt, string defaultResponse) {
 	/RETURN
 }
 
-SUB writeBotIniOption(string opt, string value) {
-	/ini "${botIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+SUB writeBotIniOption(string opt, string value, string iniSource) {
+	/if (${iniSource.Length}==0) /varset iniSource bot
+
+	/if (${iniSource.Equal[BOT]}) {
+		/ini "${botIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+	} else {
+		/ini "${generalIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+	}
 
 	/RETURN
 }
@@ -339,7 +369,8 @@ SUB getSpellFromCastRequest(string castRequest) {
 	/if (${FindItemCount[=${castRequest}]}>0) /return FindItem[=${castRequest}].Spell
 	/if (${Spell[${castRequest}].ID}) /return Spell[${castRequest}]
 	/if (${Me.AltAbility[${castRequest}].ID}) /return Me.AltAbility[${castRequest}].Spell
-	/if (${Me.CombatAbility[${castRequest}]}) {
+	/echo check: ${castRequest}
+	/if (${Me.CombatAbility[${castRequest}].ID}) {
 		/return Spell[${castRequest}]
 		|/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
 		|/return CombatAbility[${combatAbilityIndex}]
@@ -414,7 +445,10 @@ SUB isCastReady(string request) {
 SUB getCastTypeByCastRequest(string castRequest) {
 	/if (${Me.AltAbility[${castRequest}].ID}) /return ALTABILITY
 	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
-	/if (${Spell[${castRequest}].ID}) /return SPELL
+	
+	| changed to me.spell because bash was showing up with just "spell"
+	/if (${Me.Spell[${castRequest}].ID}) /return SPELL
+	
 	/if (${FindItemCount[${castRequest}]}) /return ITEM
 	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 	/RETURN UNKNOWN

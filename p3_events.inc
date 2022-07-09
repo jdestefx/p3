@@ -17,6 +17,18 @@ SUB EVENT_followMe(string line, string chatSender, string opts) {
 	/RETURN
 }
 
+#event idle "<#*#> p3 idle #1#"
+SUB EVENT_idle(string line, string newMode) {
+	/if (${newMode.Upper.Equal[ON]}) {
+		/bc Idle on.
+   		/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[3-9]}
+	} else {
+		/bc Idle off.
+   		/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[25-9]}
+	}
+	/RETURN
+}
+
 #event stop "<#1#> e3 stop"
 #event stop "<#1#> p3 stop"
 SUB EVENT_stop(string line, string chatSender) {
@@ -32,8 +44,6 @@ SUB EVENT_stop(string line, string chatSender) {
 #event kill "<#1#> p3 assist on #2#"
 
 SUB event_kill(string line, string chatSender, string spawnID) {
-	/IF (${Spawn[id ${spawnID}].ID}==NULL) /bc Ignoring assist call for ${spawnID}
-
 	/if (${assistLock}==TRUE) /RETURN
 	/invoke ${cq.Append[KILL;AUTHOR=${chatSender};SPAWNID=${spawnID}]}
 	/RETURN
@@ -287,37 +297,31 @@ SUB EVENT_buildSlayTeam(string line, string newMode) {
 #EVENT campCommand "[#1#(msg)] e3 camp #2#"
 #EVENT campCommand "<#1#> e3 camp #2#"
 SUB EVENT_campCommand(string line, string source, string newMode)
-	/if (${Spawn[=${newMode}].ID}!=NULL) {
-		/bc Using ${newMode} as camp location.
-		/varset campSpawnName ${newMode}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}		
+	/if (${Spawn[=${source}].ID}==NULL) {
+		/bc Ignoring because ${source} is not in my zone.
 		/return
 	}
-	
+
 	/if (${newMode.Upper.Equal[OFF]}) {
-		/call stopCamping
+		/invoke ${cq.Append[CAMPOFF;SOURCENAME=${source}]}
 		/return
 	}
 
 	/if (${newMode.Upper.Equal[HERE]}) {
-		/varset campSpawnName -
-		/varset campX ${Spawn[${source}].X}
-		/varset campY ${Spawn[${source}].Y}
-		/varset campZ ${Spawn[${source}].Z}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}
-		/bc Now camping at ${source} location.
+		/invoke ${cq.Append[CAMPON;TYPE=LOC;SOURCENAME=${source};LOCX=${Spawn[${source}].X};LOCY=${Spawn[${source}].Y};LOCZ=${Spawn[${source}].Z}]}
+		/return
 	}
 
 	/if (${newMode.Upper.Equal[THERE]}) {
-		/varset campSpawnName -
-		/varset campX ${Me.X}
-		/varset campY ${Me.Y}
-		/varset campZ ${Me.Z}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}
-		/bc Now camping at my location.
+		/invoke ${cq.Append[CAMPON;TYPE=SPAWN;SPAWNTARGETID=${Me.ID}]}
+		/return
+	}
+
+
+	| IF "NEWMODE" WAS NOT HERE OR THERE, THEN ASSUME IT WAS A SPAWN
+	/if (${Spawn[=${newMode}].ID}!=NULL) {
+		/invoke ${cq.Append[CAMPON;TYPE=SPAWN;SPAWNTARGETID=${Spawn[=${newMode}].ID}]}
+		/return
 	}
 
 /RETURN
@@ -375,17 +379,23 @@ SUB EVENT_adhocCast(string line, string chatSender, string castName, string cast
 #EVENT roamWith "[#1#(msg)] p3 roam with #1#"
 #EVENT roamWith "<#*#> p3 roam with #1#"
 SUB EVENT_roamWith(string line, string spawnSearch)
+	/if (${Spawn[=${spawnSearch}].ID}==NULL) {
+		/bc Ignoring because ${spawnSearch} is not in my zone.
+		/RETURN
+	}
+
 	/varset roamTargetID ${Spawn[${spawnSearch}].ID}
 	/invoke ${cq.Append[ROAMLOCK;TARGETID=${roamTargetID};]}
 /RETURN
 
 #EVENT stopRoam "[#1#(msg)] e3 roam off"
-#EVENT stopRoam "<#*#> e3 roam off"
+#EVENT stopRoam "<#1#> e3 roam off"
 #EVENT stopRoam "[#1#(msg)] p3 roam off"
-#EVENT stopRoam "<#*#> p3 roam off"
-SUB EVENT_stopRoam(string line, string spawnSearch)
-	/invoke ${cq.Append[ROAMLOCK;TARGETID=0;]}
-/RETURN
+#EVENT stopRoam "<#1#> p3 roam off"
+SUB EVENT_stopRoam(string line, string source) {
+	/invoke ${cq.Append[ROAMOFF;SOURCENAME=${source};]}
+	/RETURN
+}
 
 
 
@@ -574,7 +584,24 @@ SUB event_useMelee(string line, string newMode)
 /RETURN
 
 
+#event castFizzle "#*#Your spell fizz#*#!"
+SUB event_castFizzle(string line)
+	/varset castResult FIZZLE
+/RETURN
+
+#event castPower "#*#Your spell is too power#*#"
+SUB event_castPower(string line)
+	/varset castResult NOHOLD
+/RETURN
+
+
+#event castNoFunction "#*#have entered an area where levitation effects do not function#*#"
+SUB event_castNoFunction(string line)
+	/varset castResult NOHOLD
+/RETURN
+
 #event castResist "#*# resisted your #*#!"
+#event castResist "#*# resisted the #*# spell."
 SUB event_castResist(string line)
 	/varset castResult RESIST
 /RETURN
@@ -585,13 +612,74 @@ SUB event_castImmune(string line)
 /RETURN
 
 #event castNoTakeHold "Your #*# did not take hold#*#"
+#event castNoTakeHold "Your spell did not take hold#*#"
 SUB event_castNoTakeHold(string line)
 	/varset castResult NOHOLD
 /RETURN
 
 
-
 #event castInterrupted "Your #*# spell is interrupted."
+#event castInterrupted "Your spell is interrupted."
 SUB event_castInterrupted(string line)
 	/varset castResult INTERRUPT
+/RETURN
+
+
+#event spewItem "[#*#(msg)] e3 item #1#"
+#EVENT spewItem "<#*#> e3 item #1#"
+#event spewItem "[#*#(msg)] p3 item #1#"
+#EVENT spewItem "<#*#> p3 item #1#"
+   SUB EVENT_spewItem(string line, string slotNumber)
+      /if (${slotNumber.Upper.Equal[charm]}) /varset slotNumber 0
+      /if (${slotNumber.Upper.Equal[leftear]}) /varset slotNumber 1
+      /if (${slotNumber.Upper.Equal[head]}) /varset slotNumber 2
+      /if (${slotNumber.Upper.Equal[face]}) /varset slotNumber 3
+      /if (${slotNumber.Upper.Equal[rightear]}) /varset slotNumber 4
+      /if (${slotNumber.Upper.Equal[neck]}) /varset slotNumber 5
+      /if (${slotNumber.Upper.Equal[shoulder]}) /varset slotNumber 6
+      /if (${slotNumber.Upper.Equal[shoulders]}) /varset slotNumber 6
+      /if (${slotNumber.Upper.Equal[arms]}) /varset slotNumber 7
+      /if (${slotNumber.Upper.Equal[back]}) /varset slotNumber 8
+      /if (${slotNumber.Upper.Equal[leftwrist]}) /varset slotNumber 9
+      /if (${slotNumber.Upper.Equal[rightwrist]}) /varset slotNumber 10
+      /if (${slotNumber.Upper.Equal[ranged]}) /varset slotNumber 11
+      /if (${slotNumber.Upper.Equal[hands]}) /varset slotNumber 12
+      /if (${slotNumber.Upper.Equal[mainhand]}) /varset slotNumber 13
+      /if (${slotNumber.Upper.Equal[offhand]}) /varset slotNumber 14
+      /if (${slotNumber.Upper.Equal[leftfinger]}) /varset slotNumber 15
+      /if (${slotNumber.Upper.Equal[rightfinger]}) /varset slotNumber 16
+      /if (${slotNumber.Upper.Equal[chest]}) /varset slotNumber 17
+      /if (${slotNumber.Upper.Equal[legs]}) /varset slotNumber 18
+      /if (${slotNumber.Upper.Equal[feet]}) /varset slotNumber 19
+      /if (${slotNumber.Upper.Equal[waist]}) /varset slotNumber 20
+      /if (${slotNumber.Upper.Equal[powersource]}) /varset slotNumber 21
+      /if (${slotNumber.Upper.Equal[ammo]}) /varset slotNumber 22
+
+      |/bc ${Me.Inventory[${slotNumber}].HP} HP / ${Me.Inventory[${slotNumber}].Mana} MP / ${Me.Inventory[${slotNumber}].AC} AC (${Me.Inventory[${slotNumber}].ItemLink[CLICKABLE]})
+      /say ${Me.Inventory[${slotNumber}].HP} HP / ${Me.Inventory[${slotNumber}].Mana} MP / ${Me.Inventory[${slotNumber}].AC} AC (${Me.Inventory[${slotNumber}].ItemLink[CLICKABLE]})
+   /RETURN
+
+#event p3find "[#*#(msg)] p3 find #1#"
+#event p3find "<#*#> p3 find #1#"
+SUB EVENT_p3find(string line, string itemName) {
+	/if (${FindItem[${itemName}].ID}!=NULL) {
+		/say Found in my inventory: ${FindItem[${itemName}].ItemLink[CLICKABLE]}
+	}
+
+	/if (${FindItemBank[${itemName}].ID}!=NULL) {
+		/say Found in my bank: ${FindItemBank[${itemName}].ItemLink[CLICKABLE]}
+	}
+
+	/RETURN
+}
+
+#event mydeath "#*#You have been slain#*#"
+SUB EVENT_mydeath(string line)
+	/if (${beepOnDeath}==TRUE) {
+		/if (${beepOnDeathSound.Equal[FALSE]}) {
+			/beep
+		} else {
+			/beep sounds/${beepOnDeathSound}
+		}
+	}
 /RETURN

@@ -35,12 +35,15 @@ SUB autodebuffMaintenance() {
 	/if (${autoDebuffCheckTimer}>0) /return
 	/varset autoDebuffCheckTimer ${autoDebuffCheckTimerDelay}
 
+	/if (${workingOnADebuff}==TRUE) /RETURN RESET
+
 	/if (${autoDebuffEnabled}==FALSE) /RETURN
 	/if (${Me.Casting.ID}!=NULL) /return
 
 	/if (${Stick.Active}==TRUE || ${Nav.Active}==TRUE) /return
 
 	/if (${workingOnADebuff}==FALSE) /call checkAutoDebuffs
+
 
 	/RETURN
 }
@@ -72,6 +75,11 @@ SUB checkAutoDebuffs() {
 		/if (${Zone.ID} != ${targetZone} || ${Spawn[id ${targetID}].Dead}==TRUE || ${SpawnCount[id ${targetID}]}==0) {
 			/invoke ${autoDebuffIDsList.Erase[${i}]}
 		}
+
+		/if (${Spawn[id ${targetID}].Distance}>150 || ${Spawn[id ${targetID}].LineOfSight}==FALSE) {
+			/invoke ${autoDebuffIDsList.Erase[${i}]}
+		}
+
 	/next i
 
 	/if (${autoDebuffIDsList.Count}==0) /RETURN
@@ -82,10 +90,11 @@ SUB checkAutoDebuffs() {
 
 	| PERFORM DEBUFFS
 	/for i 0 to ${Math.Calc[${autoDebuffIDsList.Count}-1]}
-		/if (${autoDebuffIDsList.Item[${i}].Arg[3,_].Equal[0]}) /continue
+		/if (${autoDebuffIDsList.Item[${i}].Arg[3,_].Equal[1]}) /continue
 		/call processDebuffsForTargetID ${autoDebuffIDsList.Item[${i}].Arg[1,_]} TRUE
 		/if (${Macro.Return}==TRUE) {
 			/varset workingOnADebuff TRUE
+			/varset buffCheckTimer 60
 			/break
 		}
 	/next i
@@ -113,7 +122,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 
 	/for i 1 to ${iniCombatSpells.Size}
 		/varset currentResistCount 0
-		/varset cancelConditions
+		/varset cancelConditions TARGETDEAD|
 
 		/if (${iniCombatSpells[${i},1].Equal[-]}) /break
 
@@ -170,7 +179,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 		/if (${iniCombatSpells[${i},${bTargetOverHP}].NotEqual[-]}) {
 			/call fullTarget ${targetID}
 			/if (${Target.PctHPs} <= ${iniCombatSpells[${i},${bTargetOverHP}]}) /continue
-			/varset cancelConditions ${cancelConditions},TARGETUNDERHP:${iniCombatSpells[${i},${bTargetOverHP}]}
+			/varset cancelConditions ${cancelConditions}|TARGETUNDERHP:${iniCombatSpells[${i},${bTargetOverHP}]}
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetLifeManaRatio}].NotEqual[-]}) {
@@ -239,8 +248,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 			/delay 3
 		}
 
-		|/echo invokecastadd: SPELL=${castName};TARGETID=${targetID};
-		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};SRC=iniCombatSpells;SRCIDX=${i};ONRESULT=onDebuffCastResult]})		
+		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};SRC=iniCombatSpells;SRCIDX=${i};ONRESULT=onDebuffCastResult;cancelConditions=${cancelConditions}]})
 		/RETURN TRUE
 	/next i
 

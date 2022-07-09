@@ -1,11 +1,12 @@
 SUB p3_assist_init {
 	/call p3RegisterCommand STOP assistStop 50
 	/call p3RegisterCommand FOLLOW assistFollow 50
-	/call p3RegisterCommand KILL assistKill 50
+	/call p3RegisterCommand KILL assistKill 40
 	/call p3RegisterCommand KILL assistKillNameCheck 1
 	/call p3RegisterCommand KILL assistKillLockCheck 5
 
 	/declare assistSpawnID int outer 0
+	/declare assistSpawnIDZone int outer 0
 	/declare combatStateCheckTimer timer outer 0
 	/declare combatStateTimer timer outer 0
 	/declare combatStateTimerMax int outer 50
@@ -39,7 +40,6 @@ SUB p3_assist_init {
 SUB assistKillNameCheck(string cmd, string opts) {
 	/declare checkSpawnID int local
 
-
 	/if (${assistMustHaveName.NotEqual[FALSE]}) {
 		/varset checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
 		/if (${Spawn[id ${checkSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) /RETURN RESET
@@ -59,10 +59,16 @@ SUB assistKillLockCheck(string cmd, string opts) {
 }
 
 SUB assistKill(string cmd, string opts) {
-	/varset assistSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
-	/varset assistTime 1200s
+	/declare checkSpawnID ${getStackCommandOpt[${opts},SPAWNID]}
+	/declare sourceName string local ${getStackCommandOpt[${opts},AUTHOR]}
 
-	/if (${Spawn[id ${assistSpawnID}].Distance}>${maxAssistDistance}) /RETURN RESET
+	/if (${Spawn[=${sourceName}].ID}==NULL) /RETURN RESET
+	/if (${Spawn[id ${checkSpawnID}].ID}==NULL) /RETURN RESET
+	/if (${Spawn[id ${checkSpawnID}].Distance}>${maxAssistDistance}) /RETURN RESET
+
+	/varset assistSpawnID ${checkSpawnID}
+	/varset assistSpawnIDZone ${Zone.ID}
+	/varset assistTime 1200s
 
 	/declare lock string local
 	/varset lock ${getStackCommandOpt[${opts},LOCK]}
@@ -71,6 +77,8 @@ SUB assistKill(string cmd, string opts) {
 		/bc locking on ${assistSpawnID}
 		/varset assistLock TRUE
 	}
+
+	/if (${Me.Pet.ID}) /timed 3 /pet attack
 
 	/RETURN
 }
@@ -101,7 +109,15 @@ SUB assistMaintenance() {
 	/call updateCombatStateTimer
 
 	/if (${assistSpawnID}!=0) {
-		/if (${Spawn[id ${assistSpawnID}].ID}==NULL || ${Spawn[id ${assistSpawnID}].Dead}==TRUE) /call assistStop
+		/if (${assistSpawnIDZone}!=${Zone.ID}) {
+			/call assistStop
+			/RETURN
+		}
+
+		/if (${Spawn[id ${assistSpawnID}].ID}==NULL || ${Spawn[id ${assistSpawnID}].Dead}==TRUE) {
+			/call assistStop
+			/RETURN
+		}
 		
 		/if (${assistMustHaveName.NotEqual[FALSE]}) {
 			/if (${Spawn[id ${assistSpawnID}].CleanName.Upper.Find[${assistMustHaveName.Upper}]}==NULL) {
@@ -206,7 +222,7 @@ SUB p3_assist_tags_init {
 		/invoke ${assistTags.Append[${commandLine[${cmdPAST}].Replace[ ,]}]}
 	}
 
-	/if (${Bool[${iniPastTags}]}==TRUE) /call processIniPastTags
+	/call processIniPastTags
 
 	/RETURN
 }
@@ -318,7 +334,9 @@ SUB processIniPastTags() {
 
 	/invoke ${cq.Append[TAGSCHANGED;]}
 	/RETURN
-}SUB p3_autoabilities_init {
+}
+
+SUB p3_autoabilities_init {
 	/declare autoAbilitiesCheckTimer timer outer 0
 
 	/if (${iniSectionExists[AutoAbilities]}==FALSE) /call autoabilitiesSetupINI
@@ -429,12 +447,15 @@ SUB autodebuffMaintenance() {
 	/if (${autoDebuffCheckTimer}>0) /return
 	/varset autoDebuffCheckTimer ${autoDebuffCheckTimerDelay}
 
+	/if (${workingOnADebuff}==TRUE) /RETURN RESET
+
 	/if (${autoDebuffEnabled}==FALSE) /RETURN
 	/if (${Me.Casting.ID}!=NULL) /return
 
 	/if (${Stick.Active}==TRUE || ${Nav.Active}==TRUE) /return
 
 	/if (${workingOnADebuff}==FALSE) /call checkAutoDebuffs
+
 
 	/RETURN
 }
@@ -466,6 +487,11 @@ SUB checkAutoDebuffs() {
 		/if (${Zone.ID} != ${targetZone} || ${Spawn[id ${targetID}].Dead}==TRUE || ${SpawnCount[id ${targetID}]}==0) {
 			/invoke ${autoDebuffIDsList.Erase[${i}]}
 		}
+
+		/if (${Spawn[id ${targetID}].Distance}>150 || ${Spawn[id ${targetID}].LineOfSight}==FALSE) {
+			/invoke ${autoDebuffIDsList.Erase[${i}]}
+		}
+
 	/next i
 
 	/if (${autoDebuffIDsList.Count}==0) /RETURN
@@ -476,10 +502,11 @@ SUB checkAutoDebuffs() {
 
 	| PERFORM DEBUFFS
 	/for i 0 to ${Math.Calc[${autoDebuffIDsList.Count}-1]}
-		/if (${autoDebuffIDsList.Item[${i}].Arg[3,_].Equal[0]}) /continue
+		/if (${autoDebuffIDsList.Item[${i}].Arg[3,_].Equal[1]}) /continue
 		/call processDebuffsForTargetID ${autoDebuffIDsList.Item[${i}].Arg[1,_]} TRUE
 		/if (${Macro.Return}==TRUE) {
 			/varset workingOnADebuff TRUE
+			/varset buffCheckTimer 60
 			/break
 		}
 	/next i
@@ -507,7 +534,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 
 	/for i 1 to ${iniCombatSpells.Size}
 		/varset currentResistCount 0
-		/varset cancelConditions
+		/varset cancelConditions TARGETDEAD|
 
 		/if (${iniCombatSpells[${i},1].Equal[-]}) /break
 
@@ -564,7 +591,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 		/if (${iniCombatSpells[${i},${bTargetOverHP}].NotEqual[-]}) {
 			/call fullTarget ${targetID}
 			/if (${Target.PctHPs} <= ${iniCombatSpells[${i},${bTargetOverHP}]}) /continue
-			/varset cancelConditions ${cancelConditions},TARGETUNDERHP:${iniCombatSpells[${i},${bTargetOverHP}]}
+			/varset cancelConditions ${cancelConditions}|TARGETUNDERHP:${iniCombatSpells[${i},${bTargetOverHP}]}
 		}
 
 		/if (${iniCombatSpells[${i},${bTargetLifeManaRatio}].NotEqual[-]}) {
@@ -633,8 +660,7 @@ SUB processDebuffsForTargetID(int targetID, bool requireAutoDebuffFlag) {
 			/delay 3
 		}
 
-		|/echo invokecastadd: SPELL=${castName};TARGETID=${targetID};
-		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};SRC=iniCombatSpells;SRCIDX=${i};ONRESULT=onDebuffCastResult]})		
+		/invoke (${cq.Append[CAST;SPELL=${castName};TARGETID=${targetID};SRC=iniCombatSpells;SRCIDX=${i};ONRESULT=onDebuffCastResult;cancelConditions=${cancelConditions}]})
 		/RETURN TRUE
 	/next i
 
@@ -835,7 +861,7 @@ SUB checkAutoMed() {
 	/varset checkAutoMedTimer 3s
 
 	/if (${medLockoutTimer}>0) {
-		/bc Meditate locked out. Time remaining: ${medLockoutTimer}
+		|/bc Meditate locked out. Time remaining: ${medLockoutTimer}
 		/return
 	}
 
@@ -909,7 +935,7 @@ SUB automezMaintenance() {
 	/if (${autoMezEnabled}==TRUE) {
 
 		/call checkAutoMez
-		/if (${Macro.Return}==TRUE) /varset autoMezActionTakenTimer 200
+		/if (${Macro.Return}==TRUE) /varset autoMezActionTakenTimer 100
 
 		/if (${Macro.Return}==FALSE && ${autoMezActionTakenTimer}>0) {
 			/call clearStackActions CAST
@@ -1166,23 +1192,32 @@ SUB p3_bardtwist_init {
 
 	/call p3RegisterCommand NEWTWIST bardtwistNewTwist 50
 
+	/declare p3TwistEnabled bool outer true
+
 	/declare notCastingTimer timer outer 30
 	/declare doTwist bool outer TRUE
 
 	/declare twistOrder string outer		1 2 3 4
-	/varset twistOrder 						${getBotIniOption[Bard.TwistOrder,${twistOrder}]}
+	
+	/varset twistOrder ${getBotIniOption[Bard.TwistOrder,${twistOrder}]}
+	/varset p3TwistEnabled ${getBotIniOption[Bard.MacroControlledTwisting,${p3TwistEnabled}]}
 
 	/RETURN
 }
 
 
 SUB bardtwistMaintenance {
+	/if (${p3TwistEnabled}==FALSE) /RETURN
+
 	/if (${Me.Class.ShortName.NotEqual[BRD]}) /RETURN
 
 	/if (${Me.Casting.ID}!=NULL) /varset notCastingTimer 30
 
 	/if (${notCastingTimer}==0) {
-		/if (${Twist.Twisting}==FALSE && ${doTwist}==TRUE) /twist ${twistOrder}
+		/if (${Twist.Twisting}==FALSE && ${doTwist}==TRUE) {
+			/echo do ${twistOrder}
+			/twist ${twistOrder}
+		}
 	}
 
 	/RETURN
@@ -1191,7 +1226,6 @@ SUB bardtwistMaintenance {
 SUB bardtwistNewTwist(string cmd, string opts) {
 	/declare newOrder string local ${getStackCommandOpt[${opts},ORDER]}
 
-	/echo eff: ${Cast.Effect.ID} 
 	/if (${Cast.Effect.ID}!=NULL) {
 		/twist off
 		/delay 3
@@ -1236,6 +1270,7 @@ SUB p3_buffrequests_init {
 
 
 SUB buffrequestsMaintenance() {
+	/if (${recentlyZoned}==TRUE) /return
 	/if (${brEnabled}==TRUE) {
 		/if (${Me.Invis}==TRUE) /return
 		/if (${Me.Casting.ID}!=0) /return
@@ -1563,7 +1598,9 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},${bForceSpellID}].NotEqual[-]}) {
 			/varset buffSpellID ${iniBuffs[${i},${bForceSpellID}]}
 		}
-		
+
+		/if (${isLockoutExpired[bufflockout_${buffSpellID}]}==FALSE) /CONTINUE
+
 		/if (${iniBuffs[${i},${bIgnoreTargetType}].Equal[-]}) {
 			/if (${buffSpell.TargetType.Equal[Pet]} || ${iniBuffs[${i},${bTargetType}].Upper.Equal[PET]} ) {
 				/if (${Me.Pet.ID}==NULL) /continue
@@ -1599,6 +1636,9 @@ SUB checkBuffs {
 			}
 
 			/if (${NetBots[${targetName}].State.Equal[DEAD]}) /continue
+
+
+			|/echo ${targetName} ${iniBuffs[1,1]}
 
 			| HAVE THE BUFF?
 			/if (${Select[${buffSpellID},${NetBots[${targetName}].Buff}]}>0 || ${Select[${buffSpellID},${NetBots[${targetName}].ShortBuff}]}>0) {
@@ -1658,7 +1698,7 @@ SUB checkBuffs {
 					/continue
 				}
 
-				/if (${Spawn[pc ${targetName}].Distance} > ${buffSpellRange}) {
+				/if (${Spawn[pc ${targetName}].Distance3D} > ${buffSpellRange}) {
 					/invoke ${targetNames.Remove[${targetName}]}
 					/continue
 				}
@@ -1708,7 +1748,7 @@ SUB checkBuffs {
 				}
 			}
 
-			/if (${Spawn[pc ${targetName}].Distance} > ${buffSpellRange}) {
+			/if (${Spawn[pc ${targetName}].Distance3D} > ${buffSpellRange}) {
 				/invoke ${targetNames.Remove[${targetName}]}
 				/continue
 			}
@@ -1732,8 +1772,8 @@ SUB checkBuffs {
 
 		/if (${iniBuffs[${i},${bRequireGroupInRange}].NotEqual[-]}) {
 			/for k 1 to ${Group.Members}
-				/if (${Group.Member[${k}].ID}==NULL) /continue
-				/if (${Group.Member[${k}].Distance} > ${buffSpellRange}) /continue
+				/if (${Spawn[group =${Group.Member[${k}]}].ID}==NULL) /continue
+				/if (${Spawn[group =${k}].Distance3D} > ${buffSpellRange}) /continue
 			/next k
 		}
 
@@ -1755,7 +1795,6 @@ SUB checkBuffs {
 				/next k
 			}
 		}
-
 
 		/if (${buffSpawn.ID}==NULL) /continue
 		/if (${isLockoutExpired[noHoldTimer_${buffSpawn.ID}_${buffSpellID}]}==FALSE) /continue
@@ -1806,8 +1845,13 @@ SUB onBuffCastResult(string result, string opts) {
 	}
 
 	/if (${result.Equal[FAIL_NOHOLD]}==TRUE) {
-		/ECHO CALL lockout noHoldTimer_${targetID}_${buffSpellID}
+		/echo Spell did not take hold. Locking out buff ${Spell[${buffSpellID}]} for 5m.
 		/call lockout noHoldTimer_${targetID}_${buffSpellID} 5m
+	}
+
+	/if (${iniBuffs[${i},${bRecastDelay}].NotEqual[-]}) {
+		/call lockout bufflockout_${buffSpellID} ${iniBuffs[${i},${bRecastDelay}]}
+		/echo Buff recast requested. Locking out buff ${Spell[${buffSpellID}]} for ${iniBuffs[${i},${bRecastDelay}]}.
 	}
 
 	/if (${result.Equal.Equal[PASS_CAST_SUCCESS]}) {
@@ -1823,6 +1867,8 @@ SUB onBuffCastResult(string result, string opts) {
 
 SUB p3_camp_init {
 	/call p3RegisterCommand FOLLOW campFollow 50
+	/call p3RegisterCommand ROAMLOCK campRoamStarted 55
+	/call p3RegisterCommand CAMPON campCampOn 20
 
 	/declare campCheckTimer timer outer 
 	/declare campEnabled bool outer FALSE
@@ -1830,9 +1876,16 @@ SUB p3_camp_init {
 	/declare campX int outer
 	/declare campY int outer
 	/declare campZ int outer
+	/declare campSpawnID int outer 0
 
-	/declare campSpawnName string outer -
+	/RETURN
+}
 
+SUB campRoamStarted(string cmd, string opts) {
+	/if (${campEnabled}==TRUE) {
+		/varset campEnabled FALSE
+		/bc Camp disabled to allow roam.
+	}
 	/RETURN
 }
 
@@ -1841,6 +1894,48 @@ SUB campFollow(string cmd, string opts) {
 		/varset campEnabled FALSE
 		/bc Camp disabled to engage follow.
 	}
+	/RETURN
+}
+
+SUB campCampOff(string cmd, string opts) {
+	/declare sourceName string local ${getStackCommandOpt[${opts},SOURCENAME]}
+	/if (${Spawn[=${sourceName}].ID}==NULL) /RETURN
+
+	/if (${campEnabled}==TRUE) {
+		/varset campEnabled FALSE
+		/bc Camp mode disabled.
+	}
+	/RETURN
+}
+
+SUB campCampOn(string cmd, string opts) {
+	/declare campType string local ${getStackCommandOpt[${opts},TYPE]}
+	/declare spawnTargetID int local
+	/declare sourceName string local
+
+	/if (${campType.Equal[SPAWN]}) {
+		/varset spawnTargetID ${getStackCommandOpt[${opts},SPAWNTARGETID]}
+		/if (${Spawn[id ${spawnTargetID}].ID}==NULL) /RETURN RESET
+
+		/bc Using spawn ${Spawn[id ${spawnTargetID}]} as camp location.
+		/varset campSpawnID ${spawnTargetID}
+		/varset campEnabled TRUE
+		/varset campStartZoneID ${Zone.ID}
+	}
+
+	/if (${campType.Equal[LOC]}) {
+		/varset sourceName ${getStackCommandOpt[${opts},SOURCENAME]}
+		/if (${Spawn[=${sourceName}].ID}==NULL) /RETURN RESET
+
+		/varset campSpawnID 0
+		/varset campX ${Spawn[${sourceName}].X}
+		/varset campY ${Spawn[${sourceName}].Y}
+		/varset campZ ${Spawn[${sourceName}].Z}
+		/varset campEnabled TRUE
+		/varset campStartZoneID ${Zone.ID}
+		/bc Now camping at ${sourceName}'s location.
+	}
+
 	/RETURN
 }
 
@@ -1863,10 +1958,10 @@ SUB checkCamp() {
 	/if (${Stick.Active}==TRUE || ${Navigation.Active}==TRUE) /RETURN
 	/if (${combatStateTimer}>0) /RETURN
 
-	/if (${campSpawnName.NotEqual[-]}) {
-		/varset campX ${Spawn[=${campSpawnName}].X}
-		/varset campY ${Spawn[=${campSpawnName}].Y}
-		/varset campZ ${Spawn[=${campSpawnName}].Z}
+	/if (${campSpawnID}!=0) {
+		/varset campX ${Spawn[id ${campSpawnID}].X}
+		/varset campY ${Spawn[id ${campSpawnID}].Y}
+		/varset campZ ${Spawn[id ${campSpawnID}].Z}
 	}
 
 	/if (${Math.Distance[${campY}, ${campX}, ${campZ}]}>15) {
@@ -1949,24 +2044,34 @@ SUB castingStop(string cmd, string opts) {
 SUB castingCast(string cmd, string opts) {
 	/call p3cast ${getStackCommandOpt[${opts},TARGETID]} "${getStackCommandOpt[${opts},SPELL]}" "${getStackCommandOpt[${opts},SRC]}" ${getStackCommandOpt[${opts},SRCIDX]}
 
+	/varset castingOpts ${opts}
+	/echo ret: ${Macro.Return}  ${opts}
+
 	/if (${Macro.Return.Equal[PASS_STARTED]}) {
-		/varset castingOpts ${opts}
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
+
 		/vardata untrackedCastSpell castingSpellEmpty
 		/varset castingTargetID ${getStackCommandOpt[${castingOpts},TARGETID]}
 		/invoke ${castingCancelConditions.Append[${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]}
-		/echo Cast Started [${castingSpell}].
+		/echo Cast Started: [${castingSpell}].
+
 	} else /if (${Macro.Return.Equal[PASS_INSTANT_CAST]}) {
-		/echo Instant cast [${getStackCommandOpt[${opts},SPELL]}] done.
-		/varset castingOpts ${opts}
+		/echo Instant cast done: [${getStackCommandOpt[${opts},SPELL]}]
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
 		/call castComplete ${castResult}
+
+	} else /if (${Macro.Return.Equal[PASS_ABILITY_DONE]}) {
+		/echo Ability Used: [${getStackCommandOpt[${opts},SPELL]}].
+
+	} else /if (${Macro.Return.Equal[FAIL_ABILITY_NOT_READY]}) {
+		/echo Ability Not Ready: [${getStackCommandOpt[${opts},SPELL]}].
+
 	} else /if (${Macro.Return.Find[FAIL_LOS]}!=NULL) {
 		/echo Couldn't cast. No line of sight.
-		/RETURN
+
 	} else /if (${Macro.Return.Find[FAIL_]}!=NULL) {
 		/echo Cast didn't start [${castingOpts}] => ${Macro.Return}
-		/call castComplete ${Macro.Return}
+
 	}
 
 	/RETURN
@@ -1976,8 +2081,10 @@ SUB castingMaintenance() {
 	/declare sourceArr string local
 	/declare i int local
 
-	/if (${Twist.Twisting}==TRUE && ${Me.Casting.ID}==${castingSpell.ID}) {
-		/if (${Cast.Timing}==0) /twist off
+	/if (${Twist.Twisting}==TRUE && ${Me.Casting.ID}==${castingSpell.ID} && ${castingSpell.ID}!=0) {
+		/if (${Cast.Timing}==0) {
+			/twist off
+		}
 		/RETURN RESET
 	}
 
@@ -1997,15 +2104,18 @@ SUB castingMaintenance() {
 			/if (${castResult.Equal[IDLE]}) /varset castResult STARTED
 			/call castingSetIdle
 		} else {
-			|/echo Casting ${castingSpell} as expected...
+			|/echo Casting ${castingSpell} as expected... CC: ${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}
 			/varset buffCheckTimer 10
-			/if (${castingTargetID}==${Target.ID}) /call checkCancelConditions
+			/if (${castingTargetID}==${Target.ID}) {
+				/call checkCancelConditions
 
-			/if (${Macro.Return}==TRUE) {
-				/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
-				/interrupt
-				/delay 3
-				/RETURN RESET
+				/if (${Macro.Return}==TRUE) {
+					/BC Cancel Conditions met: [${getStackCommandOpt[${castingOpts},CANCELCONDITIONS]}]
+					/interrupt
+					/delay 3
+					/call castingSetIdle
+					/RETURN RESET
+				}
 			}
 		}
 
@@ -2019,6 +2129,13 @@ SUB castingMaintenance() {
 			/varset sourceArr ${getStackCommandOpt[${castingOpts},SRC]}
 			/varset i ${getStackCommandOpt[${castingOpts},SRCIDX]}
 
+			/if (${castResult.Equal[-]}) {
+				| DIDN'T CATCH A CAST RESULT - NOTHING TO DO
+				/BC Woops - Didn't catch a cast result.
+				/em is confused.
+				/RETURN
+			}
+
 			/if (${castResult.Equal[STARTED]}) /varset castResult SUCCESS
 
 			/if (${${sourceArr}[${i},${bAssumeSuccess}].NotEqual[-]}) {
@@ -2028,7 +2145,6 @@ SUB castingMaintenance() {
 				| PROCESS CHAT EVENTS TO MAKE SURE RESISTS AND SUCH GET REGISTERED
 				/doevents
 				/delay 5
-				/echo Result => ${castResult}
 			}
 			
 			/if (${${sourceArr}[${i},${bNoSitTimer}].NotEqual[-]}) {
@@ -2042,7 +2158,8 @@ SUB castingMaintenance() {
 				/call castComplete FAIL_${castResult}
 			}
 
-			/call castingSetIdle
+			/varset castResult -
+
 			/RETURN
 		}
 
@@ -2066,7 +2183,6 @@ SUB checkCancelConditions() {
 		/if (${e.Find[TARGETDEAD]}!=NULL) {
 			/if (${Target.Dead}==TRUE) /return TRUE
 		}
-
 
 		/if (${e.Find[TARGETISASSITTARGET]}!=NULL) {
 			/if (${assistSpawnID}==${Target.ID}) /return TRUE
@@ -2103,11 +2219,12 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/declare castSpell spell local
 	/declare bardWasTwisting bool local FALSE
 	/declare ret string local
-	/declare hasCastTime bool local true
+	/declare hasCastTime bool local TRUE
 
 	/call getCastTypeByCastRequest "${castName}"
 	/if (${Macro.Return.Equal[UNKNOWN]}) /RETURN FAIL_UNKNOWN_SPELL
 	/varset castType ${Macro.Return}
+
 
 	| CHECK ABILITIES AND HANDLE RIGHT AWAY SINCE THEY DONT HAVE "SPELLS" 
 	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
@@ -2116,18 +2233,33 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 	/call getSpellFromCastRequest "${castName}"
 
 	/if (${Macro.Return.Equal[UNKNOWN]}) {
-		| UNKNOWN is probably a combat ability like taunt, can allow.
+		/vardata castSpell castingSpellEmpty
+
 	} else /if (${Macro.Return.NotEqual[ABILITY]}) {
 		/vardata castSpell ${Macro.Return}
 		/if (${Spawn[id ${targetID}].LineOfSight}==FALSE && ${castSpell.SpellType.Find[Detri]}) /RETURN FAIL_LOS
 	}
 
-	/if (${isCastReady[${castName}]}==FALSE) /RETURN FAIL_CAST_NOT_READY
+	/if (${isCastReady[${castName}]}==FALSE) {
+		/if (${castType.Equal[ABILITY]}) {
+			/RETURN FAIL_ABILITY_NOT_READY
+		}
+
+		/vardata castSpell castingSpellEmpty
+		/RETURN FAIL_CAST_NOT_READY
+	}
 
 	/if (${castType.Equal[ALTABILITY]} && ${AltAbility[${castName}].Spell.CastTime}==0) /varset hasCastTime FALSE
 	/if (${castType.Equal[ITEM]} && ${FindItem[=${castName}].CastTime}==0) /varset hasCastTime FALSE
 	/if (${castType.Equal[ABILITY]}) /varset hasCastTime FALSE
-	/if (${castType.Equal[DISCIPLINE]}) /varset hasCastTime FALSE
+	/if (${castType.Equal[DISCIPLINE]}) {
+		/if (${Spell[${castName}].MyCastTime} != NULL && ${Spell[${castName}].MyCastTime}>0) {
+			/echo has cast time: ${Spell[${castName}]}
+			/varset hasCastTime TRUE
+		} else {
+			/varset hasCastTime FALSE
+		}
+	}
 
 	/echo Casting/Doing [${castName}] => ${Spawn[id ${targetID}].CleanName}
 
@@ -2146,27 +2278,27 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 
 	/if (${castType.Equal[ABILITY]}) {
 		/doability ${Me.Ability[${castName}]}
-		/RETURN PASS_INSTANT_CAST
-	
+		/RETURN PASS_ABILITY_DONE	
+
 	} else /if (${castType.Equal[DISCIPLINE]}) {
 		/disc ${castName}
-		/RETURN PASS_INSTANT_CAST
 
+		/if (${hasCastTime}==TRUE) /RETURN PASS_STARTED
+		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
 	} else /if (${castType.Equal[ALTABILITY]}) {
 		/alt act ${AltAbility[${castName}].ID}
 		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
-
 	} else /if (${castType.Equal[ITEM]}) {
-		/useitem "${castName}"
-		|/itemnotify "${castName}" rightmouseup
+		|/useitem "${castName}"
+		/itemnotify "${castName}" rightmouseup
+		/delay 5
 		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
-
 	} else /if (${castType.Equal[SPELL]}) {
 		/if (${Me.Class.ShortName.Equal[BRD]} && ${castType.Equal[SPELL]}) {
 			|/CAST ${Me.Gem[${castName}]}
 			/twist once ${Me.Gem[${castName}]}
 		} else {
-			/cast "${castName}"
+			/cast ${Me.Gem[${castName}]}
 		}
 	}
 
@@ -2178,7 +2310,6 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 }
 
 SUB castComplete(string result) {
-
 	/varset buffCheckTimer 10
 	/declare funcName string local
 	/declare i int local ${getStackCommandOpt[${castingOpts},SRCIDX]}
@@ -2197,53 +2328,51 @@ SUB castComplete(string result) {
 	/varset recastDelayTimerName detriTimer_${cSpell.ID}
 	/varset targetDurationTimerName detriTimer_${targetID}_${cSpell.ID}
 
-	|/if (${trackRecast.Equal[1]}) {
-		/if (${result.Find[FAIL_NOHOLD]}!=NULL) {
-			/call lockout ${recastDelayTimerName} 120
+	/if (${result.Find[FAIL_NOHOLD]}!=NULL) {
+		/call lockout ${recastDelayTimerName} 120
 
-		} else /if (${result.Find[PASS_]}!=NULL) {
-			/if (${iniCombatSpells[${i},${bNoSitTimer}].NotEqual[-]}) {
-				/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
-			}
-
-			/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
-				/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
-			}
-
-			/if (${cSpell.Duration.TotalSeconds}>0) {
-				/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
-			}
-
-			|/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]} || ${cSpell.Duration.TotalSeconds} > 0) {
-			|}
-
-		} else /if (${result.Equal[FAIL_RESIST]}) {
-			|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}
-			|/bc Cast Attempts: ${currentResistCount} of ${maxResists}
-			|/if (${currentResistCount}<${maxResists}) {
-			|	/while (${isCastReady[${cSpellName}]}==FALSE) {
-			|		/delay 2
-			|	}
-			|	/goto :resistRetry
-			|}
-			|
-			|/if (${currentResistCount}==${maxResists}) {
-			|	/bc My spell was resisted too much.  Giving up...
-			|	/g Giving up casting ${cSpellName} on ${spellKillID}, too many resists.
-			|	/declare ${recastDelayTimerName} timer outer 5m
-			|}
-		} else /if (${result.Equal[FAIL_IMMUNE]}) {
-			/bc Immune.  Giving up...
-			/g Giving up casting ${cSpellName} on ${spellKillID}, target is immune.
-			/call lockout ${recastDelayTimerName} 5m
+	} else /if (${result.Find[PASS_]}!=NULL) {
+		/if (${iniCombatSpells[${i},${bNoSitTimer}].NotEqual[-]}) {
+			/call pauseAutoMed ${iniCombatSpells[${i},${bNoSitTimer}]}
 		}
-	|}
+
+		/if (${iniCombatSpells[${i},${bRecastDelay}].NotEqual[-]}) {
+			/call lockout ${recastDelayTimerName} ${iniCombatSpells[${i},${bRecastDelay}]}
+		}
+
+		/if (${cSpell.Duration.TotalSeconds}>0) {
+			/call lockout ${targetDurationTimerName} ${Math.Calc[${cSpell.Duration.TotalSeconds}*10]}
+		}
+
+	} else /if (${result.Equal[FAIL_RESIST]}) {
+		|/varset currentResistCount ${Math.Calc[${currentResistCount}+1]}
+		|/bc Cast Attempts: ${currentResistCount} of ${maxResists}
+		|/if (${currentResistCount}<${maxResists}) {
+		|	/while (${isCastReady[${cSpellName}]}==FALSE) {
+		|		/delay 2
+		|	}
+		|	/goto :resistRetry
+		|}
+		|
+		|/if (${currentResistCount}==${maxResists}) {
+		|	/bc My spell was resisted too much.  Giving up...
+		|	/g Giving up casting ${cSpellName} on ${spellKillID}, too many resists.
+		|	/declare ${recastDelayTimerName} timer outer 5m
+		|}
+	} else /if (${result.Equal[FAIL_IMMUNE]}) {
+		/bc Immune.  Giving up...
+		/g Giving up casting ${cSpellName} on ${spellKillID}, target is immune.
+		/call lockout ${recastDelayTimerName} 5m
+	}
 
 	/varset funcName ${getStackCommandOpt[${castingOpts},ONRESULT]}
 
-	/if (${funcName.Equal[-]}) /RETURN
-
-	/call ${funcName} ${result} "${castingOpts}"
+	/if (${funcName.Equal[-]}) {
+		/call castingSetIdle
+	} else {
+		/call ${funcName} ${result} "${castingOpts}"
+		/call castingSetIdle
+	}
 
 	/RETURN
 }
@@ -2343,7 +2472,7 @@ SUB checkAdhocCastList() {
 SUB onAdhocCastResult(string result, string opts) {
 	/declare removeIndex string local ${getStackCommandOpt[${opts},ADHOCINDEX]}
 	
-	/if (${result.NotEqual[FAIL_INTERRUPT]}) {
+	/if (${result.NotEqual[FAIL_INTERRUPT]} && ${result.NotEqual[FAIL_FIZZLE]}) {
 		/invoke ${adhocCastList.Erase[${removeIndex}]}
 	}
 
@@ -2455,6 +2584,48 @@ SUB charmSpawnByID() {
 	/RETURN
 }
 
+SUB p3_eqemu_init {
+	/declare myCorpseName string outer ${Me.CleanName}'s corpse
+	/declare currentCorpseTargetID int outer 0
+
+	/RETURN
+}
+
+SUB eqemuMaintenance() {
+	/if (${Spawn[pccorpse ${myCorpseName} radius 50].ID}!=NULL) {
+		/if (${Window[LootWnd]}==TRUE) {
+			|/delay 10
+			|/notify LootWnd LW_LootAllButton leftmouseup
+			/RETURN RESET
+		}
+
+		/echo Corpse pickup routine activated...
+		/varset currentCorpseTargetID ${Spawn[pccorpse ${myCorpseName} radius 50].ID}
+
+		/while (${Spawn[id ${currentCorpseTargetID}].Distance}>10) {
+			/if (${Stick.Active}==FALSE) {
+				/stick 5 id ${currentCorpseTargetID}
+				/face fast id ${currentCorpseTargetID}
+			}
+			/delay 3
+		}
+
+		/stick off
+
+		/delay 3
+
+		/tar id ${currentCorpseTargetID}
+		/delay 2
+		/loot
+		/delay 5
+ 		/notify LootWnd LW_LootAllButton leftmouseup
+
+		/RETURN RESET
+	}
+
+	/RETURN
+}
+
 #event followMe "<#1#> e3 follow me"
 #event followMe "<#1#> e3 follow me #2#"
 
@@ -2474,6 +2645,18 @@ SUB EVENT_followMe(string line, string chatSender, string opts) {
 	/RETURN
 }
 
+#event idle "<#*#> p3 idle #1#"
+SUB EVENT_idle(string line, string newMode) {
+	/if (${newMode.Upper.Equal[ON]}) {
+		/bc Idle on.
+   		/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[3-9]}
+	} else {
+		/bc Idle off.
+   		/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[25-9]}
+	}
+	/RETURN
+}
+
 #event stop "<#1#> e3 stop"
 #event stop "<#1#> p3 stop"
 SUB EVENT_stop(string line, string chatSender) {
@@ -2489,8 +2672,6 @@ SUB EVENT_stop(string line, string chatSender) {
 #event kill "<#1#> p3 assist on #2#"
 
 SUB event_kill(string line, string chatSender, string spawnID) {
-	/IF (${Spawn[id ${spawnID}].ID}==NULL) /bc Ignoring assist call for ${spawnID}
-
 	/if (${assistLock}==TRUE) /RETURN
 	/invoke ${cq.Append[KILL;AUTHOR=${chatSender};SPAWNID=${spawnID}]}
 	/RETURN
@@ -2744,37 +2925,31 @@ SUB EVENT_buildSlayTeam(string line, string newMode) {
 #EVENT campCommand "[#1#(msg)] e3 camp #2#"
 #EVENT campCommand "<#1#> e3 camp #2#"
 SUB EVENT_campCommand(string line, string source, string newMode)
-	/if (${Spawn[=${newMode}].ID}!=NULL) {
-		/bc Using ${newMode} as camp location.
-		/varset campSpawnName ${newMode}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}		
+	/if (${Spawn[=${source}].ID}==NULL) {
+		/bc Ignoring because ${source} is not in my zone.
 		/return
 	}
-	
+
 	/if (${newMode.Upper.Equal[OFF]}) {
-		/call stopCamping
+		/invoke ${cq.Append[CAMPOFF;SOURCENAME=${source}]}
 		/return
 	}
 
 	/if (${newMode.Upper.Equal[HERE]}) {
-		/varset campSpawnName -
-		/varset campX ${Spawn[${source}].X}
-		/varset campY ${Spawn[${source}].Y}
-		/varset campZ ${Spawn[${source}].Z}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}
-		/bc Now camping at ${source} location.
+		/invoke ${cq.Append[CAMPON;TYPE=LOC;SOURCENAME=${source};LOCX=${Spawn[${source}].X};LOCY=${Spawn[${source}].Y};LOCZ=${Spawn[${source}].Z}]}
+		/return
 	}
 
 	/if (${newMode.Upper.Equal[THERE]}) {
-		/varset campSpawnName -
-		/varset campX ${Me.X}
-		/varset campY ${Me.Y}
-		/varset campZ ${Me.Z}
-		/varset campEnabled TRUE
-		/varset campStartZoneID ${Zone.ID}
-		/bc Now camping at my location.
+		/invoke ${cq.Append[CAMPON;TYPE=SPAWN;SPAWNTARGETID=${Me.ID}]}
+		/return
+	}
+
+
+	| IF "NEWMODE" WAS NOT HERE OR THERE, THEN ASSUME IT WAS A SPAWN
+	/if (${Spawn[=${newMode}].ID}!=NULL) {
+		/invoke ${cq.Append[CAMPON;TYPE=SPAWN;SPAWNTARGETID=${Spawn[=${newMode}].ID}]}
+		/return
 	}
 
 /RETURN
@@ -2832,17 +3007,23 @@ SUB EVENT_adhocCast(string line, string chatSender, string castName, string cast
 #EVENT roamWith "[#1#(msg)] p3 roam with #1#"
 #EVENT roamWith "<#*#> p3 roam with #1#"
 SUB EVENT_roamWith(string line, string spawnSearch)
+	/if (${Spawn[=${spawnSearch}].ID}==NULL) {
+		/bc Ignoring because ${spawnSearch} is not in my zone.
+		/RETURN
+	}
+
 	/varset roamTargetID ${Spawn[${spawnSearch}].ID}
 	/invoke ${cq.Append[ROAMLOCK;TARGETID=${roamTargetID};]}
 /RETURN
 
 #EVENT stopRoam "[#1#(msg)] e3 roam off"
-#EVENT stopRoam "<#*#> e3 roam off"
+#EVENT stopRoam "<#1#> e3 roam off"
 #EVENT stopRoam "[#1#(msg)] p3 roam off"
-#EVENT stopRoam "<#*#> p3 roam off"
-SUB EVENT_stopRoam(string line, string spawnSearch)
-	/invoke ${cq.Append[ROAMLOCK;TARGETID=0;]}
-/RETURN
+#EVENT stopRoam "<#1#> p3 roam off"
+SUB EVENT_stopRoam(string line, string source) {
+	/invoke ${cq.Append[ROAMOFF;SOURCENAME=${source};]}
+	/RETURN
+}
 
 
 
@@ -3031,7 +3212,24 @@ SUB event_useMelee(string line, string newMode)
 /RETURN
 
 
+#event castFizzle "#*#Your spell fizz#*#!"
+SUB event_castFizzle(string line)
+	/varset castResult FIZZLE
+/RETURN
+
+#event castPower "#*#Your spell is too power#*#"
+SUB event_castPower(string line)
+	/varset castResult NOHOLD
+/RETURN
+
+
+#event castNoFunction "#*#have entered an area where levitation effects do not function#*#"
+SUB event_castNoFunction(string line)
+	/varset castResult NOHOLD
+/RETURN
+
 #event castResist "#*# resisted your #*#!"
+#event castResist "#*# resisted the #*# spell."
 SUB event_castResist(string line)
 	/varset castResult RESIST
 /RETURN
@@ -3042,15 +3240,76 @@ SUB event_castImmune(string line)
 /RETURN
 
 #event castNoTakeHold "Your #*# did not take hold#*#"
+#event castNoTakeHold "Your spell did not take hold#*#"
 SUB event_castNoTakeHold(string line)
 	/varset castResult NOHOLD
 /RETURN
 
 
-
 #event castInterrupted "Your #*# spell is interrupted."
+#event castInterrupted "Your spell is interrupted."
 SUB event_castInterrupted(string line)
 	/varset castResult INTERRUPT
+/RETURN
+
+
+#event spewItem "[#*#(msg)] e3 item #1#"
+#EVENT spewItem "<#*#> e3 item #1#"
+#event spewItem "[#*#(msg)] p3 item #1#"
+#EVENT spewItem "<#*#> p3 item #1#"
+   SUB EVENT_spewItem(string line, string slotNumber)
+      /if (${slotNumber.Upper.Equal[charm]}) /varset slotNumber 0
+      /if (${slotNumber.Upper.Equal[leftear]}) /varset slotNumber 1
+      /if (${slotNumber.Upper.Equal[head]}) /varset slotNumber 2
+      /if (${slotNumber.Upper.Equal[face]}) /varset slotNumber 3
+      /if (${slotNumber.Upper.Equal[rightear]}) /varset slotNumber 4
+      /if (${slotNumber.Upper.Equal[neck]}) /varset slotNumber 5
+      /if (${slotNumber.Upper.Equal[shoulder]}) /varset slotNumber 6
+      /if (${slotNumber.Upper.Equal[shoulders]}) /varset slotNumber 6
+      /if (${slotNumber.Upper.Equal[arms]}) /varset slotNumber 7
+      /if (${slotNumber.Upper.Equal[back]}) /varset slotNumber 8
+      /if (${slotNumber.Upper.Equal[leftwrist]}) /varset slotNumber 9
+      /if (${slotNumber.Upper.Equal[rightwrist]}) /varset slotNumber 10
+      /if (${slotNumber.Upper.Equal[ranged]}) /varset slotNumber 11
+      /if (${slotNumber.Upper.Equal[hands]}) /varset slotNumber 12
+      /if (${slotNumber.Upper.Equal[mainhand]}) /varset slotNumber 13
+      /if (${slotNumber.Upper.Equal[offhand]}) /varset slotNumber 14
+      /if (${slotNumber.Upper.Equal[leftfinger]}) /varset slotNumber 15
+      /if (${slotNumber.Upper.Equal[rightfinger]}) /varset slotNumber 16
+      /if (${slotNumber.Upper.Equal[chest]}) /varset slotNumber 17
+      /if (${slotNumber.Upper.Equal[legs]}) /varset slotNumber 18
+      /if (${slotNumber.Upper.Equal[feet]}) /varset slotNumber 19
+      /if (${slotNumber.Upper.Equal[waist]}) /varset slotNumber 20
+      /if (${slotNumber.Upper.Equal[powersource]}) /varset slotNumber 21
+      /if (${slotNumber.Upper.Equal[ammo]}) /varset slotNumber 22
+
+      |/bc ${Me.Inventory[${slotNumber}].HP} HP / ${Me.Inventory[${slotNumber}].Mana} MP / ${Me.Inventory[${slotNumber}].AC} AC (${Me.Inventory[${slotNumber}].ItemLink[CLICKABLE]})
+      /say ${Me.Inventory[${slotNumber}].HP} HP / ${Me.Inventory[${slotNumber}].Mana} MP / ${Me.Inventory[${slotNumber}].AC} AC (${Me.Inventory[${slotNumber}].ItemLink[CLICKABLE]})
+   /RETURN
+
+#event p3find "[#*#(msg)] p3 find #1#"
+#event p3find "<#*#> p3 find #1#"
+SUB EVENT_p3find(string line, string itemName) {
+	/if (${FindItem[${itemName}].ID}!=NULL) {
+		/say Found in my inventory: ${FindItem[${itemName}].ItemLink[CLICKABLE]}
+	}
+
+	/if (${FindItemBank[${itemName}].ID}!=NULL) {
+		/say Found in my bank: ${FindItemBank[${itemName}].ItemLink[CLICKABLE]}
+	}
+
+	/RETURN
+}
+
+#event mydeath "#*#You have been slain#*#"
+SUB EVENT_mydeath(string line)
+	/if (${beepOnDeath}==TRUE) {
+		/if (${beepOnDeathSound.Equal[FALSE]}) {
+			/beep
+		} else {
+			/beep sounds/${beepOnDeathSound}
+		}
+	}
 /RETURN
 SUB p3_exptrack_init() {
 	
@@ -3105,6 +3364,8 @@ SUB expTrackerNewExp() {
 	}
 	/RETURN
 }
+
+
 SUB p3_global_init {
 	/declare autoKeywordIgnoreValues ON,OFF,YES,NO,NONE
 	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions,AutoDebuffs
@@ -3112,6 +3373,11 @@ SUB p3_global_init {
 	/declare debugMode bool outer FALSE
 	/declare botIniFile string outer -
 	/declare allNetbotNames string outer
+	/declare beepOnDeath bool outer TRUE
+	/declare beepOnDeathSound string outer spx_dth.wav
+
+	/declare maxForegroundFPS int outer 30
+	/declare maxBackgroundFPS int outer 20
 
 	/call processCommandLine
 	/call initializeEntryFlagSystem
@@ -3119,18 +3385,27 @@ SUB p3_global_init {
 	/call processAutoValidateIniSections
 	/call gatherNetbotNames
 
-	/declare bcsChannels string outer	${getDefaultBCSChannels[]}
-	/varset bcsChannels 				${getBotIniOption[Misc.EQBCSChannels,${bcsChannels}]}
+	/declare bcsChannels string outer ${getDefaultBCSChannels[]}
+	/varset bcsChannels ${getBotIniOption[Misc.EQBCSChannels,${bcsChannels}]}
+
+	/varset beepOnDeath ${getBotIniOption[Misc.BeepOnDeath,TRUE,general]}
+	/varset beepOnDeathSound ${getBotIniOption[Misc.BeepOnDeathSound,${beepOnDeathSound},general]}
 
 	/ECHO bccmd channels ${bcsChannels}
 	/bccmd channels ${bcsChannels}
+
+	/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[${maxBackgroundFPS}-9]}
+	/notify AdvancedDisplayOptionsWindow ADOW_MaxFPSSlider newvalue ${Math.Calc[${maxForegroundFPS}-9]}
+	/notify OptionsDisplayPage ODP_LODBiasSlider newvalue 0
+	/notify AdvancedDisplayOptionsWindow ADOW_ActorClipPlaneSlider newvalue 50
+	/notify OptionsWindow ODP_ClipPlaneSlider newvalue 6
+
+
 
 	/RETURN
 }
 
 SUB globalMaintenance() {
-
-
 	/if (${checkOpenWindows[]}==TRUE) {
 		/delay 10
 		/RETURN RESET
@@ -3190,7 +3465,7 @@ SUB processAutoValidateIniSections() {
 
 SUB initializeEntryFlagSystem {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType,bNoTwistStop]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -3253,6 +3528,9 @@ SUB processTargets(string targets) {
 		/varset e ${targets.Token[${i},,]}
 		/if (${e.Left[1].Equal[@]}) {
 			/call getMatchesForKey "${e}"
+
+			/if (${Macro.Return.Length}==0) /continue
+
 			/if (${ret.Length}==0) {
 				/varset ret ${Macro.Return}
 			} else {
@@ -3409,6 +3687,16 @@ SUB characterPassesAllowKey(string charName, string allowKey) {
 
 	/if (${allowKey.Upper.Equal[@MONKS]}) {
 		/if (${xspawn.Class.ShortName.Equal[MNK]}) /return TRUE
+		/return FALSE
+	}
+
+	/if (${allowKey.Upper.Equal[@ROGUES]}) {
+		/if (${xspawn.Class.ShortName.Equal[ROG]}) /return TRUE
+		/return FALSE
+	}
+
+	/if (${allowKey.Upper.Equal[@BERSERKERS]}) {
+		/if (${xspawn.Class.ShortName.Equal[BER]}) /return TRUE
 		/return FALSE
 	}
 
@@ -3622,10 +3910,9 @@ SUB getDefaultBCSChannels() {
 }
 
 SUB fullTarget(int targetID) {
-
 	/if (${Target.ID} != ${targetID}) {
 		/tar id ${targetID}
-		/delay 10
+		/delay 5
 	}
 
 	/RETURN
@@ -3663,9 +3950,21 @@ SUB waitForInt(string eval, int result) {
 	/RETURN
 }
 
+SUB waitForBool(string eval, bool result, string docmd)
+	/echo waitfor bool: ${eval}
+   :loopstart
+      /doevents
+      /delay 2
+      /if (${stopWait}) {
+         /varset stopWait FALSE
+         /return
+      }
+      /if (${docmd.Length}>0) /docommand ${docmd}
+      /if (${${eval}}!=${result}) /goto :loopstart
+/RETURN
 SUB p3_heals_init {
 	/call p3RegisterCommand TAGSCHANGED healsTagsChanged 50
-	
+
 
 	/declare healsEnabled bool outer TRUE
 	/declare healCheckTimer timer outer 0
@@ -3870,7 +4169,6 @@ SUB checkHeals {
 
 			/if (${Macro.Return.Equal[-]}) /continue
 
-			/echo healspawn: ${Macro.Return}
 			/if (${Macro.Return.Length}==0) {
 				/echo ${getHealthTableIndex} ${healMask} ${healPct} ${i}
 			}
@@ -3941,16 +4239,15 @@ SUB refreshHealTables {
 
 	/for i 1 to ${netbotCount}
 		/varset netbotName ${NetBots.Client[${i}]}
-		/if (${NetBots[${netbotName}].InZone}==FALSE) /continue
 		/if (${netbotName.Equal[NULL]}) /break
-		/if (${Spawn[${netbotName}].Dead}==TRUE) /continue
+		/if (${NetBots[${netbotName}].InZone}==NULL) /continue
+		/if (${Spawn[pc =${netbotName}].ID}==NULL) /continue
+		/if (${Spawn[pc =${netbotName}].Dead}==TRUE) /continue
 		/if (${NetBots[${netbotName}].State.Equal[DEAD]}==TRUE || ${NetBots[${netbotName}].State.Equal[STUN]} && ${NetBots[${netbotName}].CurrentHPs} < -1) /continue
 		/if (${NetBots[${netbotName}].Invulnerable}==1) /continue
 
-		|/echo add: ${netbotName}
 		/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PctHPs}]}:${netbotName}:1]}
 		/invoke ${trackIDs.Append[${NetBots[${netbotName}].ID}]}
-
 
 		/if (${NetBots[${netbotName}].PetID}!=NULL) {
 			/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PetHP}]}:${Spawn[id ${NetBots[${netbotName}].PetID}].CleanName}:8]}
@@ -3958,19 +4255,19 @@ SUB refreshHealTables {
 		}
 	/next i
 
-	/if (${Me.Grouped}==TRUE) {
-		/for i 0 to ${Group.Members}
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-			/if (${Group.Member[${i}].Spawn.Dead}==TRUE) /continue
-
-			/varset spawnID ${Group.Member[${i}].ID}
-			/varset searchIndex ${trackIDs.Index[${spawnID}]}
-			/if (${searchIndex}==-1) {
-				/invoke ${healthTable.Append[${strPad[${Group.Member[${i}].PctHPs}]}:${Group.Member[${i}].CleanName}:2]}
-				/invoke ${trackIDs.Append[${spawnID}]}
-			}
-		/next i
-	}
+	|/if (${Me.Grouped}==TRUE) {
+	|	/for i 0 to ${Group.Members}
+	|		/if (${Spawn[group =${Group.Member[${i}]}].ID}==NULL) /continue
+	|		/if (${Spawn[group =${Group.Member[${i}]}].Dead}==TRUE) /continue
+	|
+	|		/varset spawnID ${Spawn[group =${Group.Member[${i}]}].ID}
+	|		/varset searchIndex ${trackIDs.Index[${spawnID}]}
+	|		/if (${searchIndex}==-1) {
+	|			/invoke ${healthTable.Append[${strPad[${Group.Member[${i}].PctHPs}]}:${Group.Member[${i}].Name}:2]}
+	|			/invoke ${trackIDs.Append[${spawnID}]}
+	|		}
+	|	/next i
+	|}
 
 	/for i 1 to 12
 		/if (${Me.XTarget[${i}].ID}==NULL) /continue
@@ -3988,27 +4285,11 @@ SUB refreshHealTables {
 
 	/invoke ${healthTable.Sort}
 
-	/return
+	|/echo ===== ${healthTable.Count}
 
-	/echo =====
-	/echo ${healthTable.Item[0]}
-	/echo ${healthTable.Item[1]}
-	/echo ${healthTable.Item[2]}
-	/echo ${healthTable.Item[3]}
-	/echo ${healthTable.Item[4]}
-	/echo ${healthTable.Item[5]}
-	/echo ${healthTable.Item[6]}
-	/echo ${healthTable.Item[7]}
-	/echo ${healthTable.Item[8]}
-	/echo ${healthTable.Item[9]}
-	/echo ${healthTable.Item[10]}
-	/echo ${healthTable.Item[11]}
-	/echo ${healthTable.Item[12]}
-	/echo ${healthTable.Item[13]}
-	/echo ${healthTable.Item[14]}
-	/echo ${healthTable.Item[15]}
-	/echo ${healthTable.Item[16]}
-	/echo ${healthTable.Item[17]}
+	/for i 0 to ${Math.Calc[${healthTable.Count}-1]} {
+		|/echo ${healthTable.Item[${i}]}
+	/next i
 
 	/RETURN
 }
@@ -4045,9 +4326,10 @@ SUB checkHurtPartyMembers(string params, int distanceLimit)
 
 	/declare i int local 0
 	/for i 0 to ${Group.Members}
-		/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-		/if (${Group.Member[${i}].Dead}==TRUE) /continue
-		/if (${distanceLimit} > 0 && ${Group.Member[${i}].Distance} > ${distanceLimit}) /continue
+		/if (${Spawn[group =${Group.Member[${i}]}].ID}==NULL) /continue
+		/if (${Spawn[group =${Group.Member[${i}]}].Dead}==TRUE) /continue
+
+		/if (${distanceLimit} > 0 && ${Spawn[group =${Group.Member[${i}]}].Distance3D} > ${distanceLimit}) /continue
 		/if (${Group.Member[${i}].PctHPs} > ${requireHealthPct}) /continue
 
 		/varset hurtChars ${Math.Calc[${hurtChars}+1]}
@@ -4084,7 +4366,7 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 		}
 
 		/if (${iniHeals[${iniIndex},${bCheckShortBuffs}].NotEqual[-]}) {
-			/if (${mask}!=1) /continue
+			/if (${Math.Calc[${mask}&1]}==0) /continue
 			/call getSpellFromCastRequest "${iniHeals[${iniIndex},1]}"
 			/if (${Macro.Return.Equal[UNKNOWN]}) /continue
 			/if (${NetBots[${name}].ShortBuff.Find[${${Macro.Return}.ID}]}!=0) /continue
@@ -4107,11 +4389,11 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 
 		| bRequireHurtPartyMembers implies group memeber, so verify
 		/if (${iniHeals[${iniIndex},${bRequireHurtPartyMembers}].NotEqual[-]}) {
-			/if (${Group.Member[${name}].ID}==NULL) /continue
+			/if (${Spawn[group =${name}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireGroup}].NotEqual[-]}) {
-			/if (${Group.Member[${name}].ID}==NULL) /continue
+			/if (${Spawn[group =${name}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bTargetUnderLevel}].NotEqual[-]}) {
@@ -4139,6 +4421,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 	/declare healNames list local
 	/declare li listiterator local
 	/declare b string local
+	/declare grpMemID int local
 	
 	/if (${iniHeals[${iniIndex},${bIncludeXTargets}].NotEqual[-]} || ${iniHeals[${iniIndex},${bOnlyXTargets}].NotEqual[-]})  {
 		/for i 1 to 12
@@ -4165,12 +4448,11 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 	/varset lowestPct 100
 	/if (${Me.Grouped}==TRUE && ${iniHeals[${iniIndex},${bIncludeGroup}].NotEqual[-]}) {
 		/for i 1 to 5
-			/if (${Group.Member[${i}].ID}==NULL) /continue
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
+			/varset grpMemID ${Spawn[group =${Group.Member[${i}]}].ID}
+			/if (${Spawn[id ${grpMemID}].ID}==NULL) /continue
 			/if (${Group.Member[${i}].PctHPs} > ${healPct}) /continue
 			/if (${healNames.Contains[${Group.Member[${i}]}==FALSE) /continue				
-			/if (${isLockoutExpired[heal_${Group.Member[${i}].ID}_${iniHeals[${iniIndex},1]}]}==FALSE) /continue
+			/if (${isLockoutExpired[heal_${grpMemID}_${iniHeals[${iniIndex},1]}]}==FALSE) /continue
 
 			/if (${Group.Member[${i}].PctHPs}<=${lowestPct}) {
 				/varset lowestPct ${Group.Member[${i}].PctHPs}
@@ -4206,7 +4488,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireGroup}].NotEqual[-]}) {
-			/if (${Group.Member[${netbotName}].ID}==NULL) /continue
+			/if (${Spawn[group =${netbotName}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bTargetUnderLevel}].NotEqual[-]}) {
@@ -4230,7 +4512,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 
 		| bRequireHurtPartyMembers implies group memeber, so verify
 		/if (${iniHeals[${iniIndex},${bRequireHurtPartyMembers}].NotEqual[-]}) {
-			/if (${Group.Member[${netbotName}].ID}==NULL) /continue
+			/if (${Spawn[group =${netbotName}].ID}==NULL) /continue
 		}
 
 		/if (${NetBots[${netbotName}].PctHPs} <= ${healPct}) {
@@ -4318,10 +4600,7 @@ SUB determineTeamIndex
 		}
 	/next i
 
-	|/echo my team index: ${teamIndex}
-
 /RETURN
-
 
 
 SUB checkAutoRez() {
@@ -4370,7 +4649,6 @@ SUB checkAutoRez() {
 	/RETURN
 }
 
-
 SUB onRezCastResult(string result, string opts) {
 
 	/if (${result.Find[PASS_]}!=NULL) {
@@ -4402,7 +4680,7 @@ SUB getReadyRezSpell() {
 }
 
 SUB p3_meleecombat_init {
-	/call p3RegisterCommand KILL meleecombatKill 50
+	/call p3RegisterCommand KILL meleecombatKill 55
 	/call p3RegisterCommand STOP meleecombatStop 50
 	/call p3RegisterCommand FOLLOW meleecombatFollow 50
 	/call p3RegisterCommand ROAMMOVESTART meleecombatRoamMoveStart 45
@@ -4473,14 +4751,14 @@ SUB meleecombatMaintenance() {
 }
 
 SUB p3_mine_init() {
-	/call p3RegisterCommand KILL onMineKillCommand 10
+	/call p3RegisterCommand KILL onMineKillCommand 60
 	
     /declare rogSneakEnabled bool outer FALSE
 
 	/declare advPathPresent bool outer FALSE
 	/if (${Plugin[MQ2AdvPath].Name.Length}!=NULL) /varset advPathPresent TRUE
 
-    /declare wuCheck bool outer FALSE
+    /declare wuCheck bool outer TRUE
     /declare wuCheckTimer timer outer
     /declare wuRecheckTime int outer 30
 
@@ -4492,7 +4770,9 @@ SUB mineMaintenance() {
         /call checkRogSneak
     }
 
-    /if (${wuCheck}==TRUE) {
+    /if (${Me.Class.ShortName.Equal[MNK]} && ${wuCheck}==TRUE) {
+        /if (${assistSpawnID}==0) /return
+
         /if (${Me.Invis}==FALSE && ${Me.CombatAbilityReady[Fists of Wu]}==TRUE && ${Me.ActiveDisc.ID}==NULL) {
             /if (${Me.Song[Fists of Wu].ID}==NULL || ${Me.Song[Fists of Wu].Duration.TotalSeconds}<5) {
                 /call checkWu
@@ -4657,6 +4937,174 @@ Sub Event_VishDT
     /return
 
 
+
+#event wuoff "<#1#> wu off"
+#event wuoff "[#1#(msg)] wu off"
+SUB EVENT_wuoff(string line, string chatSender) {
+    /if (${Me.Class.ShortName.Equal[MNK]}) /bc Turning wuCheck off.
+    /varset wuCheck FALSE
+    /RETURN
+}
+
+#event wuon "<#1#> wu on"
+#event wuon "[#1#(msg)] wu off"
+SUB EVENT_wuon(string line, string chatSender) {
+    /if (${Me.Class.ShortName.Equal[MNK]}) /bc Turning wuCheck on.
+    /varset wuCheck TRUE
+
+    /RETURN
+}
+
+
+
+
+
+#event Define_UquaKey "#*#The #1# must unlock the door to the next room.#*#"
+SUB event_Define_UquaKey(string line, string KeyToUse)
+    /rs >>^<< The ${KeyToUse} unlocks the door >>^<<
+    /popup >>^<< The ${KeyToUse} unlocks the door >>^<<
+/return
+
+
+#event setClass_Warrior "#*#Brute force and brawn#*#"
+#event setClass_Shaman "#*#cringe at the appearance of talismans#*#"
+#event setClass_Beastlord "#*#Deep gashes of feral savagery#*#"
+#event setClass_Necromancer "#*#Doom of death#*#"
+#event setClass_Cleric "#*#Dread of celestial spirit#*#"
+#event setClass_Shadowknight "#*#Dreads the strike of dead#*#"
+#event setClass_Monk "#*#Focused tranquility#*#"
+#event setClass_Bard "#*#Foreboding melody#*#"
+#event setClass_Paladin "#*#Holy blade#*#"
+#event setClass_Rogue "#*#Ignores anything behind it#*#"
+#event setClass_Enchanter "#*#Mind and body vulnerable#*#"
+#event setClass_Wizard "#*#Falters when struck with the power of the elements#*#"
+#event setClass_Berserker "#*#Shies from heavy blades#*#"
+#event setClass_Magician "#*#Summoned elements#*#"
+#event setClass_Druid "#*#The creature seems weak in the face of the power of nature#*#"
+#event setClass_Ranger "#*#True shots and fast blades#*#"
+
+SUB event_setClass_Warrior
+    /popup Spawn must be killed by a >>^<< WARRIOR >>^<<
+    /rs Spawn must be killed by a >>^<< WARRIOR >>^<<
+/return
+
+SUB event_setClass_Shaman
+    /popup Spawn must be killed by a >>^<< SHAMAN >>^<<
+    /rs Spawn must be killed by a >>^<< SHAMAN >>^<<
+/return
+
+SUB event_setClass_Beastlord
+    /popup Spawn must be killed by a >>^<< BEASTLORD >>^<<
+    /rs Spawn must be killed by a >>^<< BEASTLORD >>^<<
+/return
+
+SUB event_setClass_Necromancer
+    /popup Spawn must be killed by a >>^<< NECROMANCER >>^<<
+    /rs Spawn must be killed by a >>^<< NECROMANCER >>^<<
+/return
+
+SUB event_setClass_Cleric
+    /popup Spawn must be killed by a >>^<< CLERIC >>^<<
+    /rs Spawn must be killed by a >>^<< CLERIC >>^<<
+/return
+
+SUB event_setClass_Shadowknight
+    /popup Spawn must be killed by a >>^<< SHADOWKNIGHT >>^<<
+    /rs Spawn must be killed by a >>^<< SHADOWKNIGHT >>^<<
+/return
+
+SUB event_setClass_Monk
+    /popup Spawn must be killed by a >>^<< MONK >>^<<
+    /rs Spawn must be killed by a >>^<< MONK >>^<<
+/return
+
+SUB event_setClass_Bard
+    /popup Spawn must be killed by a >>^<< BARD >>^<<
+    /rs Spawn must be killed by a >>^<< BARD >>^<<
+/return
+
+SUB event_setClass_Paladin
+    /popup Spawn must be killed by a >>^<< PALADIN >>^<<
+    /rs Spawn must be killed by a >>^<< PALADIN >>^<<
+/return
+
+SUB event_setClass_Rogue
+    /popup Spawn must be killed by a >>^<< ROGUE >>^<<
+    /rs Spawn must be killed by a >>^<< ROGUE >>^<<
+/return
+
+SUB event_setClass_Enchanter
+    /popup Spawn must be killed by a >>^<< ENCHANTER >>^<<
+    /rs Spawn must be killed by a >>^<< ENCHANTER >>^<<
+/return
+
+SUB event_setClass_Wizard
+    /popup Spawn must be killed by a >>^<< WIZARD >>^<<
+    /rs Spawn must be killed by a >>^<< WIZARD >>^<<
+/return
+
+SUB event_setClass_Berserker
+    /popup Spawn must be killed by a >>^<< BERSERKER >>^<<
+    /rs Spawn must be killed by a >>^<< BERSERKER >>^<<
+/return
+
+SUB event_setClass_Magician
+    /popup Spawn must be killed by a >>^<< MAGICIAN >>^<<
+    /rs Spawn must be killed by a >>^<< MAGICIAN >>^<<
+/return
+
+SUB event_setClass_Druid
+    /popup Spawn must be killed by a >>^<< DRUID >>^<<
+    /rs Spawn must be killed by a >>^<< DRUID >>^<<
+/return
+
+SUB event_setClass_Ranger
+    /popup Spawn must be killed by a >>^<< RANGER >>^<<
+    /rs Spawn must be killed by a >>^<< RANGER >>^<<
+/return
+
+#event startClass_Priests "#*#The creature cannot stand up to the power of healers#*#"
+#event startClass_Hybrids "#*#The creature appears weak to the combined effort of might and magic#*#"
+#event startClass_Casters "#*#The creature will perish under the strength of intelligent magic#*#"
+#event startClass_Melees "#*#The creature appears weak to the combined effort of strength and cunning#*#"
+
+SUB event_startClass_Priests
+    /if (!${Defined[murauderKill]}) {
+        /declare murauderKill int outer 3
+    } else /if (${Defined[murauderKill]}) {
+        /varset murauderKill 3
+    }
+    /rs Spawn must be killed by a >>^<< PRIEST >>^<<
+/return
+
+SUB event_startClass_Hybrids
+    /if (!${Defined[murauderKill]}) {
+        /declare murauderKill int outer 2
+    } else /if (${Defined[murauderKill]}) {
+        /varset murauderKill 2
+    }
+    /rs Spawn must be killed by a >>^<< HYBRID >>^<<
+/return
+
+SUB event_startClass_Casters
+    /if (!${Defined[murauderKill]}) {
+        /declare murauderKill int outer 1
+    } else /if (${Defined[murauderKill]}) {
+        /varset murauderKill 1
+    }
+    /rs Spawn must be killed by a >>^<< CASTER >>^<<
+/return
+
+SUB event_startClass_Melees
+    /if (!${Defined[murauderKill]}) {
+        /declare murauderKill int outer 4
+    } else /if (${Defined[murauderKill]}) {
+        /varset murauderKill 4
+    }
+    /rs Spawn must be killed by a >>^<< MELEE >>^<<
+/return
+
+
 SUB p3_movement_init {
 	/call p3RegisterCommand FOLLOW movementFollowDistCheck 01
 	/call p3RegisterCommand FOLLOW movementFollow 60
@@ -4679,6 +5127,7 @@ SUB p3_movement_init {
 	/declare activeStickDistance string outer
 	/declare movingTimer timer outer 0
 	/declare fearStartXYZ string outer -
+	/declare stickStartZone int outer 0
 
 	/declare followStickFlags string outer 			UW
 	/declare followStickDistance string outer 		10
@@ -4698,12 +5147,15 @@ SUB p3_movement_init {
 	/varset feignAutoStand ${getBotIniOption[Misc.AutoStandFromFeign,${feignAutoStand}]}
 	/varset followMaxResponseDist ${getBotIniOption[Misc.FollowMaxResponseDist,${followMaxResponseDist}]}
 
+	/if (${meleeStickFlags.Equal[FALSE]}) /varset meleeStickFlags
+
 	/RETURN
 }
 
 
 SUB movementMaintenance() {
 	/if (${Me.Moving}==TRUE) /varset movingTimer 10
+	/if (${Me.Ducking}==TRUE) /stand
 
 	/if (${Me.Feared.ID}!=NULL && ${fearReturnToStart}==TRUE) {
 		/if (${fearStartXYZ.Equal[-]}) /varset fearStartXYZ ${Me.X} ${Me.Y} ${Me.Z}
@@ -4737,6 +5189,11 @@ SUB movementMaintenance() {
 		/RETURN
 	}
 
+	/if (${stickStartZone} != 0 && ${Zone.ID}!=${stickStartZone}) {
+		/call movementStop
+		/return
+	}
+
 	/if (${Spawn[id ${stickTargetID}].ID}==NULL || ${Spawn[id ${stickTargetID}].Dead}==TRUE) {
 		/if (${Nav.Active}) /nav stop
 		/if (${Stick.Active}) /stick off
@@ -4756,16 +5213,18 @@ SUB movementMaintenance() {
 
 	/if (${Stick.StickTarget}!=${stickTargetID} || ${Stick.Active}==FALSE || ${needRestick}==TRUE || ${Me.FeetWet}==TRUE && ${feetWetStickTimer}==0) {
 		/if (${Nav.Active}==TRUE) /nav stop
-		|/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags} 
+		|/bc /stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
 		/stick id ${stickTargetID} ${activeStickDistance} ${activeStickFlags}
+		/if (${Me.Sitting}==TRUE) /stand
 		/varset needRestick FALSE
 		/if (${Me.FeetWet}==TRUE) /varset feetWetStickTimer 40
 	}
 
+
 	| BECAUSE STICK WILL FREAK OUT ALONG WALLS, RE-FACING THE MOB MAINTAINS PROPER MELEEING
 	/if (${refaceTimer}==0) {
-		/squelch /face id ${stickTargetID}
-		/varset refaceTimer 20
+		/squelch /face fast id ${stickTargetID}
+		/varset refaceTimer 5
 	}
 
 	/RETURN
@@ -4783,7 +5242,6 @@ SUB movementLockoutStick(string t) {
 }
 
 SUB movementRoamMoveStart(string cmd, string opts) {
-	/echo lockout stick!
 	/varset stickRoamLockoutTimer 30
 
 	/RETURN
@@ -4803,7 +5261,6 @@ SUB movementRaiseAnchor(string cmd, string opts) {
 SUB movementFollowDistCheck(string cmd, string opts) {
 	/declare tmpID int local ${getStackCommandOpt[${opts},SPAWNID]}
 
-	/echo ${Spawn[id ${tmpID}].Distance3D} 
 	/if (${Spawn[id ${tmpID}].Distance3D}>${followMaxResponseDist}) {
 		/RETURN RESET
 	}
@@ -4812,20 +5269,22 @@ SUB movementFollowDistCheck(string cmd, string opts) {
 }
 
 SUB movementFollow (string cmd, string opts) {
-	/echo distcheck1
 
 	/varset stickMode FOLLOW
 
 	/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
+	/varset stickStartZone ${Zone.ID}
 
 	/call setActiveStickParams ${stickMode}
 
 	/RETURN
 }
 
-SUB movementStop (string cmd, string opts) {
+SUB movementStop(string cmd, string opts) {
 	/varset stickTargetID 0
+	/varset stickStartZone 0
 	/moveto stop
+	/stick off
 	/if (${Nav.Active}==TRUE) /nav stop
 
 	/RETURN
@@ -4834,7 +5293,6 @@ SUB movementStop (string cmd, string opts) {
 SUB movementKill(string cmd, string opts) {
 	/varset stickMode MELEE
 
-	/echo movement kill:
 	/if (${useMeleeCombat}==TRUE) {
 		/varset stickTargetID ${getStackCommandOpt[${opts},SPAWNID]}
 		/call setActiveStickParams ${stickMode}
@@ -4910,10 +5368,13 @@ SUB checkMeleeRetreat() {
 }
 SUB p3_roam_init() {
 	/call p3RegisterCommand ROAMLOCK roamRoam 50
+	/call p3RegisterCommand ROAMOFF roamRoamOff 50
+	/call p3RegisterCommand CAMPON roamCampOn 60
 	
 	/declare roamTargetID int outer 0
 	/declare roamMode bool outer FALSE
 	/declare roamRefreshTimer timer outer 0
+	/declare roamTargetZoneID int outer 0
 
 	/declare roamFlyDown bool outer FALSE
 	/varset roamFlyDown ${getBotIniOption[Misc.RoamFlyDown,${roamFlyDown}]}
@@ -4927,6 +5388,29 @@ SUB roamMaintenance() {
 	/RETURN
 }
 
+SUB roamRoamOff(string cmd, string opts) {
+	/declare sourceName string local ${getStackCommandOpt[${opts},SOURCENAME]}
+	/if (${Spawn[=${sourceName}].ID}==FALSE) /RETURN
+	/if (${roamMode}==FALSE) /RETURN
+
+	/call disableRoam
+
+	/RETURN
+}
+
+SUB disableRoam() {
+	/varset roamTargetZoneID 0
+	/varset roamMode FALSE
+	/bc Roam off.
+	/RETURN
+}
+
+SUB roamCampOn(string cmd, string opts) {
+	/if (${roamMode}==FALSE) /RETURN
+	/call disableRoam
+	/RETURN
+}
+
 SUB roamRoam(string cmd, string opts) {
 	/declare targetID string local ${getStackCommandOpt[${opts},TARGETID]}
 
@@ -4936,6 +5420,7 @@ SUB roamRoam(string cmd, string opts) {
 	} else {
 		/varset roamMode TRUE
 		/varset roamTargetID ${targetID}
+		/varset roamTargetZoneID ${Zone.ID}
 		/bc Roaming with ${Spawn[id ${roamTargetID}].CleanName}
 	}
 
@@ -4950,7 +5435,18 @@ SUB checkRoam() {
 			/call assistStop STOP STOP;ASSISTHOLDTIMER=20
 		}
 		
+		/if (${Zone.ID}!=${roamTargetZoneID}) /RETURN
+
 		/if (${navPlugin}==TRUE) {
+			/if (${Navigation.PathExists[id ${roamTargetID}]}==FALSE) {
+				/bc Can't find path to my roam target. Trying face/walk for 1s.
+				/face fast id ${roamTargetID}
+				/keypress FORWARD HOLD
+				/delay 10
+				/keypress FORWARD
+				/return
+			}
+
 			/nav id ${roamTargetID}
 			/if (${roamFlyDown}==TRUE) {
 				/keypress CMD_MOVE_DOWN hold
@@ -4967,7 +5463,7 @@ SUB checkRoam() {
 
 SUB p3_slay_init {
 	/call p3RegisterCommand STOP slayStop 50
-	/call p3RegisterCommand KILL slayKill 50
+	/call p3RegisterCommand KILL slayKill 55
 
 	/declare slayProxMobs list outer
 	/declare slayTankStates[16] string outer -
@@ -5012,6 +5508,7 @@ SUB slayStop(string cmd, string opts) {
 }
 
 SUB slayMaintenance {
+	/if (${Me.Invis}==TRUE) /return
 	/if (${slayEnabled}==FALSE) /return
 	/if (${amSlayLeader}==FALSE) /return
 	/if (${slayCheckTimer}>0) /return
@@ -5050,6 +5547,7 @@ SUB scanMobs() {
 		/echo ${mobCount}
 		/for i 1 to ${mobCount}
 			/vardata xSpawn NearestSpawn[${i},${slaySearch} npcpet]
+			/if (${xSapwn.Master.Type.Equal[PC]}) /continue
 			/if (${xSpawn.Aggressive}==FALSE) /continue
 			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
 		/next i
@@ -5175,14 +5673,22 @@ SUB slayBuildTeam() {
 }
 
 SUB p3_spellcombat_init {
+	/call p3RegisterCommand TAGSCHANGED spellcombatTagsChanged 10
+
 	/call p3RegisterCommand KILL spellcombatKill 50
 	/call p3RegisterCommand STOP spellcombatStop 50
 
 	/declare combatSpellsCheckTimer timer outer 0
 	/declare spellKillID int outer 0
 
-	|/call validateSpellBasedArray iniCombatSpells
+	/call validateTagsFromArray iniCombatSpells
 
+	/RETURN
+}
+
+
+SUB spellcombatTagsChanged() {
+	/call validateTagsFromArray iniCombatSpells
 	/RETURN
 }
 
@@ -5259,6 +5765,9 @@ SUB checkCombatSpells {
 
 		/if (${cSpellName.Equal[-]}) /break
 
+		/if (${iniCombatSpells[${i},${bEnabled}].Equal[NO]}) /continue
+		/if (${iniCombatSpells[${i},${bTagsInvalidated}].Equal[YES]}) /continue
+
 		/if (${iniCombatSpells[${i},${bNotIfMounted}].NotEqual[-]}) {
 			/if (${Me.Mount.ID}!=NULL) /CONTINUE
 		}
@@ -5267,23 +5776,26 @@ SUB checkCombatSpells {
 			/continue
 		}
 
-
 		/if (${iniCombatSpells[${i},${bRequireCastIdle}].NotEqual[-]}) {
 			/if (${idleCastingTimer}>0) /CONTINUE
 		}
 
-		/if (${iniCombatSpells[${i},${bNotIfAssistTag}].NotEqual[-]}) {
-			/if (${assistTags.Count}>0 || ${assistTags.Count}>0) {
-				/call validateAssistTags ${iniCombatSpells[${i},${bNotIfAssistTag}]} TRUE
-				/if (${Macro.Return}==TRUE) /CONTINUE
-			}
+		/if (${iniCombatSpells[${i},${bGiftOfMana}].NotEqual[-]}) {
+			/if (${Me.Song[Gift Of Mana].ID}==NULL) /continue
 		}
 
-		/if (${iniCombatSpells[${i},${bRequireAssistTag}].NotEqual[-]}) {
-			/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /CONTINUE
-			/call validateAssistTags ${iniCombatSpells[${i},${bRequireAssistTag}]}
-			/if (${Macro.Return}==FALSE) /CONTINUE
-		}
+		|/if (${iniCombatSpells[${i},${bNotIfAssistTag}].NotEqual[-]}) {
+		|	/if (${assistTags.Count}>0 || ${assistTags.Count}>0) {
+		|		/call validateAssistTags ${iniCombatSpells[${i},${bNotIfAssistTag}]} TRUE
+		|		/if (${Macro.Return}==TRUE) /CONTINUE
+		|	}
+		|}
+
+		|/if (${iniCombatSpells[${i},${bRequireAssistTag}].NotEqual[-]}) {
+		|	/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /CONTINUE
+		|	/call validateAssistTags ${iniCombatSpells[${i},${bRequireAssistTag}]}
+		|	/if (${Macro.Return}==FALSE) /CONTINUE
+		|}
 
 		/if (${iniCombatSpells[${i},${bMaxResists}].NotEqual[-]}) {
 			/varset maxResists ${iniCombatSpells[${i},${bMaxResists}]}
@@ -5404,9 +5916,9 @@ SUB onCombatCastResult(string result, string opts) {
 
 
 SUB p3_tank_init() {
-	|/call p3RegisterCommand STOP tankStop 40
-	|/call p3RegisterCommand KILL tankKill 40
-	
+	/call p3RegisterCommand TAGSCHANGED tankTagsChanged 50
+
+
 	/declare tankModeEnabled bool outer FALSE
 	/declare dontTakeAggroFrom string outer NONE
 	/declare tauntSuccessList list outer
@@ -5429,6 +5941,13 @@ SUB tankMaintenance() {
 	/RETURN
 }
 
+
+SUB tankTagsChanged() {
+	/call validateTagsFromArray iniTankActions
+	/RETURN
+}
+
+
 SUB tankKill(string cmd, string opts) {
 	/RETURN
 }
@@ -5450,6 +5969,9 @@ SUB checkTankStatus() {
 	}
 
 	/for i 1 to ${iniTankActions.Size}
+
+		/if (${iniTankActions[${i},${bTagsInvalidated}].Equal[YES]}) /continue
+		/if (${iniTankActions[${i},${bEnabled}].Equal[NO]}) /continue
 		/if (${iniTankActions[${i},1].Equal[-]}) /return
 
 		/if (${iniTankActions[${i},${bNotToT}].NotEqual[-]}) {
@@ -5588,7 +6110,7 @@ SUB targettingCast(string cmd, string opts) {
 
 	/if (${Target.ID}!=${castTargetID}) {
 		/tar id ${castTargetID}
-		/delay 3
+		/delay 10
 	}
 
 	/RETURN
@@ -5631,7 +6153,7 @@ SUB MAIN {
 	|/wire drawchaton
 	|/wire BGRenderRate 100
 
-	/echo p3 alpha: Starting...
+	/echo p3 alpha [0.10k]: Starting...
 
 	/declare cq list outer
 	/declare cqHead string outer
@@ -5644,9 +6166,11 @@ SUB MAIN {
 	/declare st int local
 	/declare et int local
 	/declare hardLoopReset bool outer FALSE
+	/declare lastZonedMark int outer 0
+	/declare recentlyZoned bool outer FALSE
 
 	/invoke ${cq.Delimiter[^]}
-	/invoke ${modules.Append[global,assist_tags,targetting,casting,castorders,charm,movement,autodebuff,automez,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
+	/invoke ${modules.Append[global,eqemu,assist_tags,targetting,casting,castorders,charm,movement,automez,autodebuff,assist,tank,exptrack,automed,heals,meleecombat,spellcombat,autoabilities,buffs,buffrequests,bardtwist,slay,camp,retreat,roam,autotrapdisarm,autodispell,mine]}
 
 	/call importCommandLine "${Param0}" "${Param1}" "${Param2}" "${Param3}" "${Param4}"
 	/call p3Setup
@@ -5663,6 +6187,7 @@ SUB MAIN {
 		/if (!${Bool[${Me.Class}]}) /endmacro
 
 
+		/call checkZoning
 		/call checkCommandQueue
 		/if (${cq.Count}>0) /continue
 
@@ -5675,6 +6200,16 @@ SUB MAIN {
 	}
 
 	/END
+}
+
+SUB checkZoning {
+	/if (${Me.LastZoned}!=${lastZonedMark}) {
+		/varset lastZonedMark ${Me.LastZoned}
+		/varset recentlyZoned TRUE
+		/timed 80 /varset recentlyZoned FALSE
+	}
+
+	/RETURN
 }
 
 SUB checkMaintenance {
@@ -5690,6 +6225,7 @@ SUB checkMaintenance {
 		}
 
 		/varset st ${MacroQuest.Running}
+		|/echo ${modules.Item[${i}]}Maintenance
 		/call ${modules.Item[${i}]}Maintenance
 
 		/varset et ${MacroQuest.Running}
@@ -5779,6 +6315,8 @@ SUB importCommandLine(string Param0, string Param1, string Param2, string Param3
 }
 
 SUB p3Setup {
+	/declare generalIniFile string outer p3_bots\general.ini
+
 	/declare defaultMeleeCombatClasses string outer BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR
 	/declare defaultSpellCombatClasses string outer CLR,DRU,NEC,WIZ,MAG,ENC,SHM
 	/declare manaClasses string outer CLR,DRU,ENC,PAL,BRD,WIZ,MAG,SHM,NEC,BST,SHD
@@ -5801,6 +6339,8 @@ SUB p3Setup {
 	/declare cfSticking int outer 4
 	/declare cfCasting int outer 8
 	/declare cfInvis int outer 16
+
+	/squelch /moveto set dist 10
 
 	/RETURN
 }
@@ -5886,7 +6426,6 @@ SUB p3RegisterCommand(string cmd, string funcName, string order) {
 }
 
 SUB getStackCommandOpt (string opts, string k) {
-
 	/declare sp int local ${opts.Find[;${k}=]}
 	/declare ret string local -
 
@@ -5897,17 +6436,23 @@ SUB getStackCommandOpt (string opts, string k) {
 	/RETURN ${ret}
 }
 
-SUB getBotIniOption(string opt, string defaultResponse) {
+SUB getBotIniOption(string opt, string defaultResponse, string iniSource) {
+	/if (${iniSource.Length}==0) /varset iniSource bot
+
 	/declare iniKey string local 
 	/declare iniValue string local
+	/declare useSource string local
+	/if (${iniSource.Equal[general]}) /varset useSource ${generalIniFile}
+	/if (${iniSource.Equal[bot]}) /varset useSource ${botIniFile}
 
-	/varset iniKey ${botIniFile},${opt.Token[1,.]},${opt.Token[2,.]}
+
+	/varset iniKey ${useSource},${opt.Token[1,.]},${opt.Token[2,.]}
 	/varset iniValue ${Ini[${iniKey}]}
 
 	/if (${iniValue.Equal[NULL]}) {
 		/if (${defaultResponse.Equal[FALSE]}) /varset defaultResponse NO
 		/if (${defaultResponse.Equal[TRUE]}) /varset defaultResponse YES
-		/call writeBotIniOption "${opt}" "${defaultResponse}"
+		/call writeBotIniOption "${opt}" "${defaultResponse}" ${iniSource}
 		/RETURN ${defaultResponse}
 	} else {
 		/if (${iniValue.Upper.Equal[ON]} || ${iniValue.Upper.Equal[YES]} || ${iniValue.Upper.Equal[TRUE]}) {
@@ -5922,8 +6467,14 @@ SUB getBotIniOption(string opt, string defaultResponse) {
 	/RETURN
 }
 
-SUB writeBotIniOption(string opt, string value) {
-	/ini "${botIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+SUB writeBotIniOption(string opt, string value, string iniSource) {
+	/if (${iniSource.Length}==0) /varset iniSource bot
+
+	/if (${iniSource.Equal[BOT]}) {
+		/ini "${botIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+	} else {
+		/ini "${generalIniFile}" "${opt.Arg[1,.]}" "${opt.Arg[2,.]}" "${value}"
+	}
 
 	/RETURN
 }
@@ -5932,7 +6483,8 @@ SUB getSpellFromCastRequest(string castRequest) {
 	/if (${FindItemCount[=${castRequest}]}>0) /return FindItem[=${castRequest}].Spell
 	/if (${Spell[${castRequest}].ID}) /return Spell[${castRequest}]
 	/if (${Me.AltAbility[${castRequest}].ID}) /return Me.AltAbility[${castRequest}].Spell
-	/if (${Me.CombatAbility[${castRequest}]}) {
+	/echo check: ${castRequest}
+	/if (${Me.CombatAbility[${castRequest}].ID}) {
 		/return Spell[${castRequest}]
 		|/varset combatAbilityIndex ${Me.CombatAbility[${castRequest}]}
 		|/return CombatAbility[${combatAbilityIndex}]
@@ -6007,7 +6559,10 @@ SUB isCastReady(string request) {
 SUB getCastTypeByCastRequest(string castRequest) {
 	/if (${Me.AltAbility[${castRequest}].ID}) /return ALTABILITY
 	/if (${Me.CombatAbility[${castRequest}]}) /return DISCIPLINE
-	/if (${Spell[${castRequest}].ID}) /return SPELL
+	
+	| changed to me.spell because bash was showing up with just "spell"
+	/if (${Me.Spell[${castRequest}].ID}) /return SPELL
+	
 	/if (${FindItemCount[${castRequest}]}) /return ITEM
 	/if (${Me.Ability[${castRequest}]}!=NULL) /return ABILITY
 	/RETURN UNKNOWN

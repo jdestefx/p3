@@ -41,7 +41,7 @@ SUB checkAutoMed() {
 	/varset checkAutoMedTimer 3s
 
 	/if (${medLockoutTimer}>0) {
-		/bc Meditate locked out. Time remaining: ${medLockoutTimer}
+		|/bc Meditate locked out. Time remaining: ${medLockoutTimer}
 		/return
 	}
 

@@ -1,6 +1,6 @@
 SUB p3_heals_init {
 	/call p3RegisterCommand TAGSCHANGED healsTagsChanged 50
-	
+
 
 	/declare healsEnabled bool outer TRUE
 	/declare healCheckTimer timer outer 0
@@ -205,7 +205,6 @@ SUB checkHeals {
 
 			/if (${Macro.Return.Equal[-]}) /continue
 
-			/echo healspawn: ${Macro.Return}
 			/if (${Macro.Return.Length}==0) {
 				/echo ${getHealthTableIndex} ${healMask} ${healPct} ${i}
 			}
@@ -276,16 +275,15 @@ SUB refreshHealTables {
 
 	/for i 1 to ${netbotCount}
 		/varset netbotName ${NetBots.Client[${i}]}
-		/if (${NetBots[${netbotName}].InZone}==FALSE) /continue
 		/if (${netbotName.Equal[NULL]}) /break
-		/if (${Spawn[${netbotName}].Dead}==TRUE) /continue
+		/if (${NetBots[${netbotName}].InZone}==NULL) /continue
+		/if (${Spawn[pc =${netbotName}].ID}==NULL) /continue
+		/if (${Spawn[pc =${netbotName}].Dead}==TRUE) /continue
 		/if (${NetBots[${netbotName}].State.Equal[DEAD]}==TRUE || ${NetBots[${netbotName}].State.Equal[STUN]} && ${NetBots[${netbotName}].CurrentHPs} < -1) /continue
 		/if (${NetBots[${netbotName}].Invulnerable}==1) /continue
 
-		|/echo add: ${netbotName}
 		/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PctHPs}]}:${netbotName}:1]}
 		/invoke ${trackIDs.Append[${NetBots[${netbotName}].ID}]}
-
 
 		/if (${NetBots[${netbotName}].PetID}!=NULL) {
 			/invoke ${healthTable.Append[${strPad[${NetBots[${netbotName}].PetHP}]}:${Spawn[id ${NetBots[${netbotName}].PetID}].CleanName}:8]}
@@ -293,19 +291,19 @@ SUB refreshHealTables {
 		}
 	/next i
 
-	/if (${Me.Grouped}==TRUE) {
-		/for i 0 to ${Group.Members}
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-			/if (${Group.Member[${i}].Spawn.Dead}==TRUE) /continue
-
-			/varset spawnID ${Group.Member[${i}].ID}
-			/varset searchIndex ${trackIDs.Index[${spawnID}]}
-			/if (${searchIndex}==-1) {
-				/invoke ${healthTable.Append[${strPad[${Group.Member[${i}].PctHPs}]}:${Group.Member[${i}].CleanName}:2]}
-				/invoke ${trackIDs.Append[${spawnID}]}
-			}
-		/next i
-	}
+	|/if (${Me.Grouped}==TRUE) {
+	|	/for i 0 to ${Group.Members}
+	|		/if (${Spawn[group =${Group.Member[${i}]}].ID}==NULL) /continue
+	|		/if (${Spawn[group =${Group.Member[${i}]}].Dead}==TRUE) /continue
+	|
+	|		/varset spawnID ${Spawn[group =${Group.Member[${i}]}].ID}
+	|		/varset searchIndex ${trackIDs.Index[${spawnID}]}
+	|		/if (${searchIndex}==-1) {
+	|			/invoke ${healthTable.Append[${strPad[${Group.Member[${i}].PctHPs}]}:${Group.Member[${i}].Name}:2]}
+	|			/invoke ${trackIDs.Append[${spawnID}]}
+	|		}
+	|	/next i
+	|}
 
 	/for i 1 to 12
 		/if (${Me.XTarget[${i}].ID}==NULL) /continue
@@ -323,27 +321,11 @@ SUB refreshHealTables {
 
 	/invoke ${healthTable.Sort}
 
-	/return
+	|/echo ===== ${healthTable.Count}
 
-	/echo =====
-	/echo ${healthTable.Item[0]}
-	/echo ${healthTable.Item[1]}
-	/echo ${healthTable.Item[2]}
-	/echo ${healthTable.Item[3]}
-	/echo ${healthTable.Item[4]}
-	/echo ${healthTable.Item[5]}
-	/echo ${healthTable.Item[6]}
-	/echo ${healthTable.Item[7]}
-	/echo ${healthTable.Item[8]}
-	/echo ${healthTable.Item[9]}
-	/echo ${healthTable.Item[10]}
-	/echo ${healthTable.Item[11]}
-	/echo ${healthTable.Item[12]}
-	/echo ${healthTable.Item[13]}
-	/echo ${healthTable.Item[14]}
-	/echo ${healthTable.Item[15]}
-	/echo ${healthTable.Item[16]}
-	/echo ${healthTable.Item[17]}
+	/for i 0 to ${Math.Calc[${healthTable.Count}-1]} {
+		|/echo ${healthTable.Item[${i}]}
+	/next i
 
 	/RETURN
 }
@@ -380,9 +362,10 @@ SUB checkHurtPartyMembers(string params, int distanceLimit)
 
 	/declare i int local 0
 	/for i 0 to ${Group.Members}
-		/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-		/if (${Group.Member[${i}].Dead}==TRUE) /continue
-		/if (${distanceLimit} > 0 && ${Group.Member[${i}].Distance} > ${distanceLimit}) /continue
+		/if (${Spawn[group =${Group.Member[${i}]}].ID}==NULL) /continue
+		/if (${Spawn[group =${Group.Member[${i}]}].Dead}==TRUE) /continue
+
+		/if (${distanceLimit} > 0 && ${Spawn[group =${Group.Member[${i}]}].Distance3D} > ${distanceLimit}) /continue
 		/if (${Group.Member[${i}].PctHPs} > ${requireHealthPct}) /continue
 
 		/varset hurtChars ${Math.Calc[${hurtChars}+1]}
@@ -419,7 +402,7 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 		}
 
 		/if (${iniHeals[${iniIndex},${bCheckShortBuffs}].NotEqual[-]}) {
-			/if (${mask}!=1) /continue
+			/if (${Math.Calc[${mask}&1]}==0) /continue
 			/call getSpellFromCastRequest "${iniHeals[${iniIndex},1]}"
 			/if (${Macro.Return.Equal[UNKNOWN]}) /continue
 			/if (${NetBots[${name}].ShortBuff.Find[${${Macro.Return}.ID}]}!=0) /continue
@@ -442,11 +425,11 @@ SUB getHealthTableEntry(int teamIndexOffset, string mask, string pctHP, int iniI
 
 		| bRequireHurtPartyMembers implies group memeber, so verify
 		/if (${iniHeals[${iniIndex},${bRequireHurtPartyMembers}].NotEqual[-]}) {
-			/if (${Group.Member[${name}].ID}==NULL) /continue
+			/if (${Spawn[group =${name}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireGroup}].NotEqual[-]}) {
-			/if (${Group.Member[${name}].ID}==NULL) /continue
+			/if (${Spawn[group =${name}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bTargetUnderLevel}].NotEqual[-]}) {
@@ -474,6 +457,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 	/declare healNames list local
 	/declare li listiterator local
 	/declare b string local
+	/declare grpMemID int local
 	
 	/if (${iniHeals[${iniIndex},${bIncludeXTargets}].NotEqual[-]} || ${iniHeals[${iniIndex},${bOnlyXTargets}].NotEqual[-]})  {
 		/for i 1 to 12
@@ -500,12 +484,11 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 	/varset lowestPct 100
 	/if (${Me.Grouped}==TRUE && ${iniHeals[${iniIndex},${bIncludeGroup}].NotEqual[-]}) {
 		/for i 1 to 5
-			/if (${Group.Member[${i}].ID}==NULL) /continue
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
-			/if (${Group.Member[${i}].OtherZone}==TRUE) /continue
+			/varset grpMemID ${Spawn[group =${Group.Member[${i}]}].ID}
+			/if (${Spawn[id ${grpMemID}].ID}==NULL) /continue
 			/if (${Group.Member[${i}].PctHPs} > ${healPct}) /continue
 			/if (${healNames.Contains[${Group.Member[${i}]}==FALSE) /continue				
-			/if (${isLockoutExpired[heal_${Group.Member[${i}].ID}_${iniHeals[${iniIndex},1]}]}==FALSE) /continue
+			/if (${isLockoutExpired[heal_${grpMemID}_${iniHeals[${iniIndex},1]}]}==FALSE) /continue
 
 			/if (${Group.Member[${i}].PctHPs}<=${lowestPct}) {
 				/varset lowestPct ${Group.Member[${i}].PctHPs}
@@ -541,7 +524,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 		}
 
 		/if (${iniHeals[${iniIndex},${bRequireGroup}].NotEqual[-]}) {
-			/if (${Group.Member[${netbotName}].ID}==NULL) /continue
+			/if (${Spawn[group =${netbotName}].ID}==NULL) /continue
 		}
 
 		/if (${iniHeals[${iniIndex},${bTargetUnderLevel}].NotEqual[-]}) {
@@ -565,7 +548,7 @@ SUB getNetBotReadyForHeal(int healPct, int iniIndex)
 
 		| bRequireHurtPartyMembers implies group memeber, so verify
 		/if (${iniHeals[${iniIndex},${bRequireHurtPartyMembers}].NotEqual[-]}) {
-			/if (${Group.Member[${netbotName}].ID}==NULL) /continue
+			/if (${Spawn[group =${netbotName}].ID}==NULL) /continue
 		}
 
 		/if (${NetBots[${netbotName}].PctHPs} <= ${healPct}) {
@@ -653,10 +636,7 @@ SUB determineTeamIndex
 		}
 	/next i
 
-	|/echo my team index: ${teamIndex}
-
 /RETURN
-
 
 
 SUB checkAutoRez() {
@@ -704,7 +684,6 @@ SUB checkAutoRez() {
 	
 	/RETURN
 }
-
 
 SUB onRezCastResult(string result, string opts) {
 

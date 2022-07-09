@@ -1,3 +1,4 @@
+
 SUB p3_global_init {
 	/declare autoKeywordIgnoreValues ON,OFF,YES,NO,NONE
 	/declare iniSectionsAutoProcess string outer Heals,CombatSpells,Buffs,AutoAbilities,BuffRequests,TankActions,AutoDebuffs
@@ -5,6 +6,11 @@ SUB p3_global_init {
 	/declare debugMode bool outer FALSE
 	/declare botIniFile string outer -
 	/declare allNetbotNames string outer
+	/declare beepOnDeath bool outer TRUE
+	/declare beepOnDeathSound string outer spx_dth.wav
+
+	/declare maxForegroundFPS int outer 30
+	/declare maxBackgroundFPS int outer 20
 
 	/call processCommandLine
 	/call initializeEntryFlagSystem
@@ -12,18 +18,27 @@ SUB p3_global_init {
 	/call processAutoValidateIniSections
 	/call gatherNetbotNames
 
-	/declare bcsChannels string outer	${getDefaultBCSChannels[]}
-	/varset bcsChannels 				${getBotIniOption[Misc.EQBCSChannels,${bcsChannels}]}
+	/declare bcsChannels string outer ${getDefaultBCSChannels[]}
+	/varset bcsChannels ${getBotIniOption[Misc.EQBCSChannels,${bcsChannels}]}
+
+	/varset beepOnDeath ${getBotIniOption[Misc.BeepOnDeath,TRUE,general]}
+	/varset beepOnDeathSound ${getBotIniOption[Misc.BeepOnDeathSound,${beepOnDeathSound},general]}
 
 	/ECHO bccmd channels ${bcsChannels}
 	/bccmd channels ${bcsChannels}
+
+	/notify AdvancedDisplayOptionsWindow ADOW_MaxBGFPSSlider newvalue ${Math.Calc[${maxBackgroundFPS}-9]}
+	/notify AdvancedDisplayOptionsWindow ADOW_MaxFPSSlider newvalue ${Math.Calc[${maxForegroundFPS}-9]}
+	/notify OptionsDisplayPage ODP_LODBiasSlider newvalue 0
+	/notify AdvancedDisplayOptionsWindow ADOW_ActorClipPlaneSlider newvalue 50
+	/notify OptionsWindow ODP_ClipPlaneSlider newvalue 6
+
+
 
 	/RETURN
 }
 
 SUB globalMaintenance() {
-
-
 	/if (${checkOpenWindows[]}==TRUE) {
 		/delay 10
 		/RETURN RESET
@@ -83,7 +98,7 @@ SUB processAutoValidateIniSections() {
 
 SUB initializeEntryFlagSystem {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType,bNoTwistStop]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -146,6 +161,9 @@ SUB processTargets(string targets) {
 		/varset e ${targets.Token[${i},,]}
 		/if (${e.Left[1].Equal[@]}) {
 			/call getMatchesForKey "${e}"
+
+			/if (${Macro.Return.Length}==0) /continue
+
 			/if (${ret.Length}==0) {
 				/varset ret ${Macro.Return}
 			} else {
@@ -302,6 +320,16 @@ SUB characterPassesAllowKey(string charName, string allowKey) {
 
 	/if (${allowKey.Upper.Equal[@MONKS]}) {
 		/if (${xspawn.Class.ShortName.Equal[MNK]}) /return TRUE
+		/return FALSE
+	}
+
+	/if (${allowKey.Upper.Equal[@ROGUES]}) {
+		/if (${xspawn.Class.ShortName.Equal[ROG]}) /return TRUE
+		/return FALSE
+	}
+
+	/if (${allowKey.Upper.Equal[@BERSERKERS]}) {
+		/if (${xspawn.Class.ShortName.Equal[BER]}) /return TRUE
 		/return FALSE
 	}
 
@@ -515,10 +543,9 @@ SUB getDefaultBCSChannels() {
 }
 
 SUB fullTarget(int targetID) {
-
 	/if (${Target.ID} != ${targetID}) {
 		/tar id ${targetID}
-		/delay 10
+		/delay 5
 	}
 
 	/RETURN
@@ -556,3 +583,15 @@ SUB waitForInt(string eval, int result) {
 	/RETURN
 }
 
+SUB waitForBool(string eval, bool result, string docmd)
+	/echo waitfor bool: ${eval}
+   :loopstart
+      /doevents
+      /delay 2
+      /if (${stopWait}) {
+         /varset stopWait FALSE
+         /return
+      }
+      /if (${docmd.Length}>0) /docommand ${docmd}
+      /if (${${eval}}!=${result}) /goto :loopstart
+/RETURN

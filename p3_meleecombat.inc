@@ -1,5 +1,5 @@
 SUB p3_meleecombat_init {
-	/call p3RegisterCommand KILL meleecombatKill 50
+	/call p3RegisterCommand KILL meleecombatKill 55
 	/call p3RegisterCommand STOP meleecombatStop 50
 	/call p3RegisterCommand FOLLOW meleecombatFollow 50
 	/call p3RegisterCommand ROAMMOVESTART meleecombatRoamMoveStart 45

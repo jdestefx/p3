@@ -1,6 +1,6 @@
 SUB p3_slay_init {
 	/call p3RegisterCommand STOP slayStop 50
-	/call p3RegisterCommand KILL slayKill 50
+	/call p3RegisterCommand KILL slayKill 55
 
 	/declare slayProxMobs list outer
 	/declare slayTankStates[16] string outer -
@@ -45,6 +45,7 @@ SUB slayStop(string cmd, string opts) {
 }
 
 SUB slayMaintenance {
+	/if (${Me.Invis}==TRUE) /return
 	/if (${slayEnabled}==FALSE) /return
 	/if (${amSlayLeader}==FALSE) /return
 	/if (${slayCheckTimer}>0) /return
@@ -83,6 +84,7 @@ SUB scanMobs() {
 		/echo ${mobCount}
 		/for i 1 to ${mobCount}
 			/vardata xSpawn NearestSpawn[${i},${slaySearch} npcpet]
+			/if (${xSapwn.Master.Type.Equal[PC]}) /continue
 			/if (${xSpawn.Aggressive}==FALSE) /continue
 			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
 		/next i

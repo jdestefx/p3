@@ -49,7 +49,7 @@ SUB targettingCast(string cmd, string opts) {
 
 	/if (${Target.ID}!=${castTargetID}) {
 		/tar id ${castTargetID}
-		/delay 3
+		/delay 10
 	}
 
 	/RETURN

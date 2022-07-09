@@ -26,6 +26,7 @@ SUB p3_buffrequests_init {
 
 
 SUB buffrequestsMaintenance() {
+	/if (${recentlyZoned}==TRUE) /return
 	/if (${brEnabled}==TRUE) {
 		/if (${Me.Invis}==TRUE) /return
 		/if (${Me.Casting.ID}!=0) /return

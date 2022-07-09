@@ -1,12 +1,20 @@
 SUB p3_spellcombat_init {
+	/call p3RegisterCommand TAGSCHANGED spellcombatTagsChanged 10
+
 	/call p3RegisterCommand KILL spellcombatKill 50
 	/call p3RegisterCommand STOP spellcombatStop 50
 
 	/declare combatSpellsCheckTimer timer outer 0
 	/declare spellKillID int outer 0
 
-	|/call validateSpellBasedArray iniCombatSpells
+	/call validateTagsFromArray iniCombatSpells
 
+	/RETURN
+}
+
+
+SUB spellcombatTagsChanged() {
+	/call validateTagsFromArray iniCombatSpells
 	/RETURN
 }
 
@@ -83,6 +91,9 @@ SUB checkCombatSpells {
 
 		/if (${cSpellName.Equal[-]}) /break
 
+		/if (${iniCombatSpells[${i},${bEnabled}].Equal[NO]}) /continue
+		/if (${iniCombatSpells[${i},${bTagsInvalidated}].Equal[YES]}) /continue
+
 		/if (${iniCombatSpells[${i},${bNotIfMounted}].NotEqual[-]}) {
 			/if (${Me.Mount.ID}!=NULL) /CONTINUE
 		}
@@ -91,23 +102,26 @@ SUB checkCombatSpells {
 			/continue
 		}
 
-
 		/if (${iniCombatSpells[${i},${bRequireCastIdle}].NotEqual[-]}) {
 			/if (${idleCastingTimer}>0) /CONTINUE
 		}
 
-		/if (${iniCombatSpells[${i},${bNotIfAssistTag}].NotEqual[-]}) {
-			/if (${assistTags.Count}>0 || ${assistTags.Count}>0) {
-				/call validateAssistTags ${iniCombatSpells[${i},${bNotIfAssistTag}]} TRUE
-				/if (${Macro.Return}==TRUE) /CONTINUE
-			}
+		/if (${iniCombatSpells[${i},${bGiftOfMana}].NotEqual[-]}) {
+			/if (${Me.Song[Gift Of Mana].ID}==NULL) /continue
 		}
 
-		/if (${iniCombatSpells[${i},${bRequireAssistTag}].NotEqual[-]}) {
-			/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /CONTINUE
-			/call validateAssistTags ${iniCombatSpells[${i},${bRequireAssistTag}]}
-			/if (${Macro.Return}==FALSE) /CONTINUE
-		}
+		|/if (${iniCombatSpells[${i},${bNotIfAssistTag}].NotEqual[-]}) {
+		|	/if (${assistTags.Count}>0 || ${assistTags.Count}>0) {
+		|		/call validateAssistTags ${iniCombatSpells[${i},${bNotIfAssistTag}]} TRUE
+		|		/if (${Macro.Return}==TRUE) /CONTINUE
+		|	}
+		|}
+
+		|/if (${iniCombatSpells[${i},${bRequireAssistTag}].NotEqual[-]}) {
+		|	/if (${assistTags.Count}==0 && ${assistTags.Count}==0) /CONTINUE
+		|	/call validateAssistTags ${iniCombatSpells[${i},${bRequireAssistTag}]}
+		|	/if (${Macro.Return}==FALSE) /CONTINUE
+		|}
 
 		/if (${iniCombatSpells[${i},${bMaxResists}].NotEqual[-]}) {
 			/varset maxResists ${iniCombatSpells[${i},${bMaxResists}]}

@@ -33,7 +33,7 @@ SUB automezMaintenance() {
 	/if (${autoMezEnabled}==TRUE) {
 
 		/call checkAutoMez
-		/if (${Macro.Return}==TRUE) /varset autoMezActionTakenTimer 200
+		/if (${Macro.Return}==TRUE) /varset autoMezActionTakenTimer 100
 
 		/if (${Macro.Return}==FALSE && ${autoMezActionTakenTimer}>0) {
 			/call clearStackActions CAST

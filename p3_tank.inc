@@ -1,7 +1,7 @@
 SUB p3_tank_init() {
-	|/call p3RegisterCommand STOP tankStop 40
-	|/call p3RegisterCommand KILL tankKill 40
-	
+	/call p3RegisterCommand TAGSCHANGED tankTagsChanged 50
+
+
 	/declare tankModeEnabled bool outer FALSE
 	/declare dontTakeAggroFrom string outer NONE
 	/declare tauntSuccessList list outer
@@ -24,6 +24,13 @@ SUB tankMaintenance() {
 	/RETURN
 }
 
+
+SUB tankTagsChanged() {
+	/call validateTagsFromArray iniTankActions
+	/RETURN
+}
+
+
 SUB tankKill(string cmd, string opts) {
 	/RETURN
 }
@@ -45,6 +52,9 @@ SUB checkTankStatus() {
 	}
 
 	/for i 1 to ${iniTankActions.Size}
+
+		/if (${iniTankActions[${i},${bTagsInvalidated}].Equal[YES]}) /continue
+		/if (${iniTankActions[${i},${bEnabled}].Equal[NO]}) /continue
 		/if (${iniTankActions[${i},1].Equal[-]}) /return
 
 		/if (${iniTankActions[${i},${bNotToT}].NotEqual[-]}) {

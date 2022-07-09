@@ -11,7 +11,7 @@ SUB p3_assist_tags_init {
 		/invoke ${assistTags.Append[${commandLine[${cmdPAST}].Replace[ ,]}]}
 	}
 
-	/if (${Bool[${iniPastTags}]}==TRUE) /call processIniPastTags
+	/call processIniPastTags
 
 	/RETURN
 }
@@ -124,3 +124,4 @@ SUB processIniPastTags() {
 	/invoke ${cq.Append[TAGSCHANGED;]}
 	/RETURN
 }
+
