@@ -82,7 +82,7 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},1].Equal[-]}) /break
 		/if (${iniBuffs[${i},${bEnabled}].Equal[NO]}) /continue
 
-		/if (${Me.Moving} || ${movingTimer}>0 && ${iniBuffs[${i},${bCastableMoving}].Equal[-]}) {
+		/if ( (${Me.Moving} || ${movingTimer}>0) && ${iniBuffs[${i},${bCastableMoving}].Equal[-]}) {
 			/continue
 		}
 
@@ -153,6 +153,7 @@ SUB checkBuffs {
 		/if (${iniBuffs[${i},${bRequireUW}].NotEqual[-]}) {
 			/if (${Me.FeetWet}==FALSE) /continue
 		}
+
 
 		| OBTAIN BUFF SPELL DETAIL
 		/varset buffCastName ${iniBuffs[${i},${bName}]}
@@ -357,8 +358,8 @@ SUB checkBuffs {
 			/if (${Spawn[pc ${targetNames.Item[${teamIndex}]}].ID}==NULL) /continue
 			/vardata buffSpawn Spawn[pc ${targetNames.Item[${teamIndex}]}]
 		} else {
-
 			/if (${iniBuffs[${i},${bTargetType}].Upper.Equal[PET]}) {
+				/echo PET!
 				/vardata buffSpawn Spawn[pcpet ${targetNames.Item[0]}]
 			} else {
 				/vardata buffSpawn emptySpawn
@@ -402,7 +403,6 @@ SUB checkBuffs {
 }
 
 SUB onBuffCastResult(string result, string opts) {
-	/echo BuffCR: ${result} ${opts}
 
 	/declare i int local ${getStackCommandOpt[${opts},SRCIDX]}
 	/declare targetID int local ${getStackCommandOpt[${opts},TARGETID]}

@@ -73,20 +73,24 @@ SUB scanMobs() {
 	/if (${mobCount}>0) {
 
 		/for i 1 to ${mobCount}
-			/vardata xSpawn NearestSpawn[${i},${slaySearch}]
-			/if (${xSpawn.Aggressive}==FALSE) /continue
-			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+			/if (${NearestSpawn[${i},${slaySearch}].ID}!=NULL) {
+				/vardata xSpawn NearestSpawn[${i},${slaySearch}]
+				/if (${xSpawn.Aggressive}==FALSE) /continue
+				/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+			}
 		/next i
 	}
 
 	/varset mobCount ${SpawnCount[${slaySearch} loc ${Me.X} ${Me.Y} npcpet]}
 	/if (${mobCount}>0) {
-		/echo ${mobCount}
 		/for i 1 to ${mobCount}
-			/vardata xSpawn NearestSpawn[${i},${slaySearch} npcpet]
-			/if (${xSapwn.Master.Type.Equal[PC]}) /continue
-			/if (${xSpawn.Aggressive}==FALSE) /continue
-			/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+			/if (${NearestSpawn[${i},${slaySearch}].ID}!=NULL) {
+				/vardata xSpawn NearestSpawn[${i},${slaySearch} npcpet]
+				/if (${xSpawn.Master.Type.Equal[PC]}) /continue
+				/if (${xSpawn.Aggressive}==FALSE) /continue
+				/if (${xSpawn.Charmed.ID}!==NULL) /continue
+				/invoke ${slayProxMobs.Append[${xSpawn.ID}]}
+			}
 		/next i
 	}
 

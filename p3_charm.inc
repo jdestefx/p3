@@ -24,7 +24,10 @@ SUB p3_charm_init() {
 
 SUB charmMaintenance() {
 
-	/if (${charmSpawnID}!=0) /call checkCharmStatus
+	/if (${charmSpawnID}!=0) {
+		/call checkCharmStatus
+		/if (${Macro.Return}==FALSE) /RETURN FALSE
+	}
 
 	/if (${charmSpawnID}!=0 && ${assistSpawnID}!=0 && ${charmCallAttackTimer}==0) {
 		/if (${Target.ID} != ${assistSpawnID}) {
@@ -32,8 +35,14 @@ SUB charmMaintenance() {
 			/delay 3
 		}
 
-		/pet attack
-		/varset charmCallAttackTimer ${charmCallAttackTimerInterval}
+		/if (${Pet.Target.ID}!=${assistSpawnID}) {
+			/tar id ${assistSpawnID}
+			/delay 10
+			/pet attack
+			/delay 10
+			/varset charmCallAttackTimer ${charmCallAttackTimerInterval}
+		}
+
 	}
 
 	/RETURN
@@ -57,7 +66,7 @@ SUB checkCharmStatus() {
 
 	/if (${Me.Pet.ID}==NULL) {
 		/call charmSpawnByID ${charmSpawnID}
-		/if (${Macro.Return}==FALSE) /RETURN 
+		/RETURN FALSE
 	}
 
 
@@ -93,6 +102,7 @@ SUB charmSpawnByID() {
 			/if (${Bool[${Target.Buff[${debuffName}]}]}==FALSE) {
 				/bc Charm target requires ${debuffName}, casting...
 				/invoke ${cq.Append[CAST;SPELL=${debuffName};TARGETID=${charmSpawnID};]}				
+
 			}
 		/next i
 

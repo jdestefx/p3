@@ -66,6 +66,8 @@ SUB checkNeedsBuffsQueue() {
 
 		/if (${Select[EMOTABLE,${iniBuffRequests[${i},${bKeyword}]},]}==0) /continue
 
+		/echo ${spellName}
+
 		/if (${iniBuffRequests[${i},${bRequireTargetClass}].NotEqual[-]}) {
 			/if (${Select[${Spawn[id ${spawnID}].Class.ShortName},${iniBuffRequests[${i},${bRequireTargetClass}]}]}==0) /continue
 		}
@@ -140,7 +142,7 @@ SUB onBuffRequestCastResult(string result, string opts) {
 	/declare repeatMode bool local ${buffQueue.Item[${buffQueueIndex}].Token[4,_]}
 
 	/if (${result.Find[PASS_]}!=NULL || ${result.Find[FAIL_NOHOLD]}!=NULL) {
-		/echo Buff request satisfied. Removing from queue.
+		/echo Buff request satisfied. Removing from queue. (${buffName})
 		/invoke ${buffQueue.Erase[${buffQueueIndex}]}		
 
 		/if (${repeatMode}==TRUE) {

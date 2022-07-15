@@ -127,6 +127,20 @@ SUB EVENT_pleaseBuffs(string line, string emoter, string hailee)
 /RETURN
 
 
+#Event pleaseBuffsMe "#1# says, 'i need buffs'"
+#Event pleaseBuffsMe "#1# says, 'i need buffs.'"
+#Event pleaseBuffsMe "#1# tells you, 'i need buffs.'"
+#Event pleaseBuffsMe "#1# tells you, 'i need buffs'"
+SUB EVENT_pleaseBuffsMe(string line, string emoter, string hailee)
+	/if (${brEnabled}==FALSE) /return
+	/if (${needsBuffPlayerQueue.Index[${emoter}]}>-1) /return
+	/invoke ${needsBuffPlayerQueue.Append[${emoter}]}
+	/em looks ${emoter} up and down.
+	/delay 2
+/RETURN
+
+
+
 #Event hailResponse "#1# says, 'Hail, #2#'" 
 SUB EVENT_hailResponse(string line, string hailer, string hailee)
 	/if (${brEnabled}==FALSE) /return
@@ -681,5 +695,27 @@ SUB EVENT_mydeath(string line)
 		} else {
 			/beep sounds/${beepOnDeathSound}
 		}
+	}
+/RETURN
+
+
+#event takeTrade "#*#take trade!#*#"
+SUB EVENT_takeTrade(string line) {
+	/notify TradeWnd TRDW_Trade_Button leftmouseup
+}
+
+
+
+
+
+#event autoLootToggle "[#1#(msg)] p3 autoloot #2#"
+#event autoLootToggle "<#1#> p3 autoloot #2#"
+SUB event_autoLootToggle(string line, string who, string newMode)
+	/if (${newMode.Upper.Equal[ON]}) {
+		/varset looter TRUE
+		/bc AutoLoot is now ON.
+	} else /if (${newMode.Upper.Equal[OFF]}) {
+		/varset looter FALSE
+		/bc AutoLoot is now OFF.
 	}
 /RETURN

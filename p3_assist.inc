@@ -78,7 +78,10 @@ SUB assistKill(string cmd, string opts) {
 		/varset assistLock TRUE
 	}
 
-	/if (${Me.Pet.ID}) /timed 3 /pet attack
+	|/if (${Me.Pet.ID}) {
+	|	/bc Pet Attack! (${Target})
+	|	/timed 3 /pet attack
+	|}
 
 	/RETURN
 }

@@ -56,7 +56,6 @@ SUB castingCast(string cmd, string opts) {
 	/call p3cast ${getStackCommandOpt[${opts},TARGETID]} "${getStackCommandOpt[${opts},SPELL]}" "${getStackCommandOpt[${opts},SRC]}" ${getStackCommandOpt[${opts},SRCIDX]}
 
 	/varset castingOpts ${opts}
-	/echo ret: ${Macro.Return}  ${opts}
 
 	/if (${Macro.Return.Equal[PASS_STARTED]}) {
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
@@ -69,6 +68,8 @@ SUB castingCast(string cmd, string opts) {
 	} else /if (${Macro.Return.Equal[PASS_INSTANT_CAST]}) {
 		/echo Instant cast done: [${getStackCommandOpt[${opts},SPELL]}]
 		/vardata castingSpell ${getSpellFromCastRequest[${getStackCommandOpt[${castingOpts},SPELL]}]}
+
+		/if (${castResult.Equal[STARTED]}) /varset castResult PASS_DISC_ACTIVATED
 		/call castComplete ${castResult}
 
 	} else /if (${Macro.Return.Equal[PASS_ABILITY_DONE]}) {
@@ -293,7 +294,6 @@ SUB p3Cast(int targetID, string castName, string arrName, int arrIdx) {
 
 	} else /if (${castType.Equal[DISCIPLINE]}) {
 		/disc ${castName}
-
 		/if (${hasCastTime}==TRUE) /RETURN PASS_STARTED
 		/if (${hasCastTime}==FALSE) /RETURN PASS_INSTANT_CAST
 	} else /if (${castType.Equal[ALTABILITY]}) {

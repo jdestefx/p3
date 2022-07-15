@@ -62,6 +62,7 @@ SUB checkAutoDebuffs() {
 		/for i 1 to ${mobCountInArea}
 			/vardata xspawn NearestSpawn[${i},${autoDebuffSpawnSearch}]
 			/if (${xspawn.Aggressive}==FALSE) /continue
+			/if (${charmSpawnID}!=0 && ${xspawn.ID}==${charmSpawnID}) /continue
 			/call addTargetForDebuffs ${xspawn.ID}
 		/next i
 	}

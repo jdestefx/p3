@@ -98,7 +98,7 @@ SUB processAutoValidateIniSections() {
 
 SUB initializeEntryFlagSystem {
 	/declare flagNamesByIndex list outer
-	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType,bNoTwistStop]}
+	/invoke ${flagNamesByIndex.Append[bNull,bName,bValue,bTargets,bExcludeTargets,bTargetOverLevel,bCastableDuringAssist,bSelfOverHP,bSelfUnderHP,bSelfOverMana,bSelfUnderMana,bCastableOnlyResting,bCastOnlyDuringAssist,bSelfUnderEnd,bSelfOverEnd,bNoCancelChecks,bRequireGroupInRange,bTargetUnderHP,bTargetOverHP,bNotIfShortBuff,bNotIfLongBuff,bRecastDelay,bHealPct,bTargetRace,bCombatOnly,bTargetUnderLevel,bUseTeamIndex,bRequireMobsInProximity,bForceSpellID,bRequireTargetClass,bNoSitTimer,bRequireBodyType,bRequireDiseased,bRequireGroup,bRequireHurtPartyMembers,bRequireMaxMobsInProximity,bRequireAssistTarget,bRequirePoisoned,bDoCommand,bNotToT,bKeyword,bRebuffSeconds,bActivateBandolier,bRevertToBandolier,bFreeze,bInstructRemove,bMaxResists,bExtendedStackCheck,bIncludeXTargets,bNoCast,bIncludeGroup,bMemInGem,bOnlyXTargets,bRequireCastIdle,bOnlyAfterTaunt,bTargetLifeManaRatio,bAmToT,bRequireCursed,bRequireAssistTag,bNotIfAssistTag,bRequireUW,bCancelAtHP,bAssumeSuccess,bRequireTeamIndexOver,bIgnoreTargetType,bNotIfMounted,bEnabled,bTagsInvalidated,bIncludeNetBotPets,bOnlyNetBotPets,bRequireTeamIndex,bTargetUnderDistance,bMyName,bCheckShortBuffs,bForceTargetType,bRequireBehindAssistTarget,bAutoDebuff,bAutoDebuffOnly,bCastableMoving,bGiftOfMana,bTargetType,bNoTwistStop,bIgnoreSanityCheck]}
 	
 	/declare i int local
 	/for i 1 to ${Math.Calc[${flagNamesByIndex.Count}-1]}
@@ -444,6 +444,7 @@ SUB validateSpellBasedArray(string arrName) {
 
 	/for i 1 to 64
 		/if (${${arrName}[${i},1].Equal[-]}) /break
+		/if (${${arrName}[${i},${bIgnoreSanityCheck}].NotEqual[-]}) /break
 
 		/if (${isRealSpell[${${arrName}[${i},${bName}]}]}==FALSE) {
 			/echo Error: >>>${${arrName}[${i},1]}<<< does not appear to be a valid spell/item/abilty in array [${arrName}]. Check spelling? Non-existant item/clicky? Disabling this spell entry until macro restart.
@@ -548,7 +549,7 @@ SUB fullTarget(int targetID) {
 		/delay 5
 	}
 
-	/RETURN
+	/RETURN TRUE
 
 	/target clear
 	/delay 2
@@ -594,4 +595,17 @@ SUB waitForBool(string eval, bool result, string docmd)
       }
       /if (${docmd.Length}>0) /docommand ${docmd}
       /if (${${eval}}!=${result}) /goto :loopstart
+/RETURN
+
+
+SUB waitForIntLTE(string eval, int result)
+	:loopstart
+		/doevents
+		/delay 1
+		/if (${stopWait}) {
+			/varset stopWait FALSE
+			/return
+		}
+
+		/if (${${eval}}>${result}) /goto :loopstart
 /RETURN
